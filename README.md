@@ -18,6 +18,17 @@ medical tumor classification.
 
 ## Python
 
+Make sure your python version matches the requirements listed in ''requirements.txt''!
+To make your life easy, I included ''conda-env.yml'' to match all python requirements
+with the help of conda. Simply create a new conda environment:
+
+    conda env create -f conda-env.yml 
+
+and activate it:
+
+    conda activate conda-env
+
+After all requirements match you may be able to execute our source code.
 All source files of the packages are included in the directory
     
     ./ml4medical/
