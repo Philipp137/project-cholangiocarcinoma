@@ -131,6 +131,3 @@ dmypy.json
 .*un~
 .pyre/
 
-# ignore everything in data folder
-/data/MSIvsMSS/
-/data/qupath/
