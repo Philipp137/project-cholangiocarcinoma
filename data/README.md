@@ -10,4 +10,4 @@ Invited users can access it via: <https://tubcloud.tu-berlin.de/f/2609679350>
 If you have a local copy of the data then you may want to symlink it to githubs data 
 folder. Therefore I execute the shell command inside the github root folder:
 
-  ln -s ~/tubCloud/project-cholangiocarcinoma ./data/
+    ln -s ~/tubCloud/project-cholangiocarcinoma ./data/
