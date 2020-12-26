@@ -27,4 +27,4 @@ transform_test = transforms.Compose([
 ])
 
 # This is the dictionary which contains both input tranformations
-data_transform = { 'train' : transform_train, 'test': transform_test}
+data_transforms = { 'train' : transform_train, 'test': transform_test}
