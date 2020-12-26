@@ -118,8 +118,8 @@ if __name__ =="__main__":
                    for x in ['train', 'test']}
     dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'test']}
     ##
-    print("Currently we have two classes: \n%s with %d samples\n%s with %d samples\n" % (class_names[0],dataset_sizes["train"],
-                                                                 class_names[1],dataset_sizes["test"]) )
+    print("Currently we have two classes: %s \ntrain: %d samples\ntest: %d samples\n" % (class_names,dataset_sizes["train"],
+                                                                                    dataset_sizes["test"]) )
     # Get a batch of training data
     inputs, classes = next(iter(dataloaders["train"]))
     # Make a grid from batch

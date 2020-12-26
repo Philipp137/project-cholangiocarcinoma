@@ -6,7 +6,7 @@
 # via import ml4medical 
 
 from .normalize import *
-from .load import data_transform
+from .load import data_transforms
 from .visualize import imshow4normalized
 
 
