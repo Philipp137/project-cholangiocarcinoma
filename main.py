@@ -29,7 +29,7 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
         print('-' * 10)
 
         # Each epoch has a training and validation phase
-        for phase in ['train', 'val']:
+        for phase in ['train', 'test']:
             if phase == 'train':
                 model.train()  # Set model to training mode
             else:
@@ -93,7 +93,7 @@ if __name__ =="__main__":
     torch.manual_seed(17)
     # first we define the transform done one every image
     transform_train = transforms.Compose([
-        transforms.RandomSizedCrop(224),
+        transforms.RandomResizedCrop(224),
         transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -101,8 +101,6 @@ if __name__ =="__main__":
     ])
 
     transform_test = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
@@ -110,11 +108,12 @@ if __name__ =="__main__":
     data_transforms = { 'train' : transform_train, 'test': transform_test}
 
     # next we load the dataset
-    data_dir = "./data/project-cholangiocarcinoma/MSIvsMSS/"
+    #data_dir = "./data/project-cholangiocarcinoma/MSIvsMSS/"
+    data_dir = "D:/Arbeit/cholangiocarcinoma-data/"
     image_datasets = {x: datasets.ImageFolder(os.path.join(data_dir, x), data_transforms[x])  for x in ['train', 'test']}
     class_names = image_datasets["train"].classes
     # and prepare everything for training
-    dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=4, shuffle=True, num_workers=4)
+    dataloaders = {x: torch.utils.data.DataLoader(image_datasets[x], batch_size=192, shuffle=True, num_workers=16)
                    for x in ['train', 'test']}
     dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'test']}
     ##
@@ -127,13 +126,7 @@ if __name__ =="__main__":
     imshow4normalized(out, title=[class_names[x] for x in classes])
 
     # train a model
-    model_ft = models.resnet18(pretrained=True)
-    num_ftrs = model_ft.fc.in_features
-    # Here the size of each output sample is set to 2.
-    # Alternatively, it can be generalized to nn.Linear(num_ftrs, len(class_names)).
-    model_ft.fc = nn.Linear(num_ftrs, 2)
-
-    model_ft = model_ft.to(device)
+    model_ft = models.resnet18(num_classes=2, pretrained=False).to(device)
 
     criterion = nn.CrossEntropyLoss()
 
