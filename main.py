@@ -13,21 +13,32 @@ import copy
 import torch.optim as optim
 from torch.optim import lr_scheduler
 
+try:
+    import tensorboard
+except ImportError as e:
+    TB_MODE = False
+else:
+    TB_MODE = True
+    from torch.utils.tensorboard import SummaryWriter
+    
 # Ignore warnings
 import warnings
 warnings.filterwarnings("ignore")
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
+def train_model(model, criterion, optimizer, scheduler, num_epochs=25, log_folder="./train_log/"):
     since = time.time()
 
+    tensorboard = SummaryWriter(log_dir=log_folder) if TB_MODE else None
+    
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
+    steps = dict(train=0, test=0)
 
     for epoch in range(num_epochs):
         print('Epoch {}/{}'.format(epoch, num_epochs - 1))
         print('-' * 10)
-
+        
         # Each epoch has a training and validation phase
         for phase in ['train', 'test']:
             if phase == 'train':
@@ -61,18 +72,33 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
                 # statistics
                 running_loss += loss.item() * inputs.size(0)
                 running_corrects += torch.sum(preds == labels.data)
+
+                if tensorboard and phase == 'train':
+                    tensorboard.add_scalar(phase+'_loss', loss.item(), steps[phase])
+                steps[phase] += 1
+                
             if phase == 'train':
                 scheduler.step()
 
             epoch_loss = running_loss / dataset_sizes[phase]
             epoch_acc = running_corrects.double() / dataset_sizes[phase]
 
+            if tensorboard:
+                tensorboard.add_scalar('epoch_' + phase + '_loss', epoch_loss, epoch)
+                tensorboard.add_scalar('epoch_' + phase + '_acc', epoch_acc, epoch)
+                
             print('{} Loss: {:.4f} Acc: {:.4f}'.format(
                 phase, epoch_loss, epoch_acc))
+            if phase == 'test':
+                save_net_weights(model, log_folder, 'current_wegihts.pt')
+                f = open(log_folder + 'train_results.txt', 'a')
+                f.write(f"Epoch: {epoch} ;  Loss: {epoch_loss:.3e} ;  Acc: {epoch_acc:.3e} \n")
+                f.close()
 
             # deep copy the model
-            if phase == 'val' and epoch_acc > best_acc:
+            if phase == 'test' and epoch_acc > best_acc:
                 best_acc = epoch_acc
+                save_net_weights(model, log_folder, 'best_acc.pt')
                 best_model_wts = copy.deepcopy(model.state_dict())
 
         print()
@@ -87,14 +113,21 @@ def train_model(model, criterion, optimizer, scheduler, num_epochs=25):
     return model
 
 
+def save_net_weights(net, fpath, fname):
+    if not os.path.isdir(fpath):
+        os.makedirs(fpath)
+    torch.save(net.state_dict(), fpath + fname)
+
+    
 if __name__ =="__main__":
 
     ##### simple example for data loading: #####
     torch.manual_seed(17)
     # first we define the transform done one every image
     transform_train = transforms.Compose([
-        transforms.RandomResizedCrop(224),
+        transforms.RandomResizedCrop(224, scale=[0.8, 1], ratio=[5./6., 6./5.]),
         transforms.RandomHorizontalFlip(),
+        transforms.RandomVerticalFlip(),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                              std=[0.229, 0.224, 0.225])
