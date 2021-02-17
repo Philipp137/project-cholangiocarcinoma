@@ -12,7 +12,7 @@ from torchvision import transforms, utils, datasets
 ###############################################
 # Data augmentation and normalization for training data
 transform_train = transforms.Compose([
-    transforms.RandomSizedCrop(224),
+    transforms.RandomResizedCrop(224),
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
     transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -20,8 +20,6 @@ transform_train = transforms.Compose([
 ])
 # Only normalization for validation data
 transform_test = transforms.Compose([
-    transforms.Resize(256),
-    transforms.CenterCrop(224),
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
