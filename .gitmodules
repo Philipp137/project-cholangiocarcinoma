@@ -1,0 +1,3 @@
+[submodule "ml4medical/PyHIST"]
+	path = ml4medical/PyHIST
+	url = https://github.com/manuel-munoz-aguirre/PyHIST.git
