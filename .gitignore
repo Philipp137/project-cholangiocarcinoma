@@ -136,3 +136,6 @@ dmypy.json
 
 # pictures
 *.jpeg
+
+# log folders
+/lightning_logs/
