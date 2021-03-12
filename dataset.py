@@ -1,6 +1,5 @@
 import torch
 import torch.distributed as dist
-import numpy as np
 import os
 from torchvision import transforms, datasets
 from pathlib import Path
@@ -62,8 +61,9 @@ class TileImageDataset(datasets.ImageFolder):
             
         self.get_tile_position = get_tile_position
         self.parent_slide = dict()
+        self.parent_slide_per_class = {n: dict() for n in range(len(self.classes))}
         self.parent_slide_name = list()
-        self.parent_slide_class =list()
+        self.parent_slide_class = list()
         self.tile_position = list()
         self.idx_in_class = {n: [] for n in range(len(self.classes))}
         self._find_tile_info()
@@ -74,11 +74,12 @@ class TileImageDataset(datasets.ImageFolder):
                 parent_slide = self.get_parent_slide(pth)
                 if parent_slide not in self.parent_slide:
                     self.parent_slide[parent_slide] = [idx]
+                    self.parent_slide_per_class[cls][parent_slide] = [idx]
                     self.parent_slide_name.append(parent_slide)
                     self.parent_slide_class.append(cls)
                 else:
                     self.parent_slide[parent_slide].append(idx)
-            
+                    self.parent_slide_per_class[cls][parent_slide].append(idx)
             if self.get_tile_position is not None:
                 self.tile_position.append(self.get_tile_position(pth))
             self.idx_in_class[cls].append(idx)
@@ -120,20 +121,21 @@ class TileSubBatchSampler(torch.utils.data.Sampler):
         self.shuffle_subs = shuffle if shuffle_subs is None else shuffle_subs
         self.distributed = distributed
         self.balance = balance
-        self.n_samples_per_class = [len(cls_idx) for cls_idx in self.ds.idx_in_class.values()]
         self.n_classes = len(self.ds.idx_in_class)
+        
         if mode == 'slide':
-            self.subs_idx = [torch.tensor(idx) for idx in self.ds.parent_slide.values()]
+            self.subs_idx = [[torch.tensor(idx) for idx in subs_idx.values()] for subs_idx in self.ds.parent_slide_per_class.values()]
         elif mode == 'class':
-            self.subs_idx = [torch.tensor(idx) for idx in self.ds.idx_in_class.values()]
-        self.class_sample_diffs = [max(self.n_samples_per_class) - n_samples for n_samples in self.n_samples_per_class]
-
+            self.subs_idx = [[torch.tensor(idx)] for idx in self.ds.idx_in_class.values()]
+            
+        self.n_subbatches_per_class = [sum([len(sub_idx) // self.subbatch_size for sub_idx in subs_in_class]) for subs_in_class in
+                                       self.subs_idx]
         if balance == 'oversample':
-            self.n_subbatches = (max(self.n_samples_per_class) // self.subbatch_size) * self.n_classes
+            self.n_subbatches = max(self.n_subbatches_per_class) * self.n_classes
         elif balance == 'undersample':
-            self.n_subbatches = (min(self.n_samples_per_class) // self.subbatch_size) * self.n_classes
+            self.n_subbatches = min(self.n_subbatches_per_class) * self.n_classes
         else:
-            self.n_subbatches = sum([len(sub_idx) // self.subbatch_size for sub_idx in self.subs_idx])
+            self.n_subbatches = sum(self.n_subbatches_per_class)
         
         # taken/adapted from torch.distributed.DistributedSampler:
         if distributed:
@@ -158,37 +160,54 @@ class TileSubBatchSampler(torch.utils.data.Sampler):
         self.epoch = 0
         
     
-    def get_subbatched_sample_indexes(self):
-        idx_per_sub = [sub_idx[torch.randperm(len(sub_idx))] for sub_idx in self.subs_idx] if self.shuffle_subs else self.subs_idx
+    def __iter__(self):
         
-        if self.mode == 'class':
-            # In case of self.shuffle_subs == False, this is not very clean, since for each epoch we either always oversample the same first
+        # parts taken/adapted from torch.distributed.DistributedSampler
+        
+        if self.shuffle or self.shuffle_subs:
+            g = torch.Generator()
+            g.manual_seed(self.epoch)
+
+        idx_per_sub_per_class = [[sub_idx[torch.randperm(len(sub_idx), generator=g)] for sub_idx in subs_idx_in_class]
+                                 for subs_idx_in_class in self.subs_idx] if self.shuffle_subs else self.subs_idx
+
+        idxs_in_subbatches_per_class = [
+            torch.cat([
+                torch.cat([
+                    sub_idx[i:i + self.subbatch_size][None, :] for i in range(0, len(sub_idx), self.subbatch_size)
+                    if len(sub_idx[i:i + self.subbatch_size]) == self.subbatch_size
+                ], dim=0) for sub_idx in subs_idx_in_class if len(sub_idx) > self.subbatch_size
+            ], dim=0) for subs_idx_in_class in idx_per_sub_per_class
+        ]
+        
+        
+        if self.shuffle:
+            indices_per_class = [torch.randperm(len(idxs_in_subbatches), generator=g)
+                                 for idxs_in_subbatches in idxs_in_subbatches_per_class]
+        else:
+            indices_per_class = [torch.arange(len(idxs_in_subbatches)) for idxs_in_subbatches in idxs_in_subbatches_per_class]
+            
+        # balance classes:
+        n_subs_per_class = [len(idxs) for idxs in indices_per_class]
+        if self.balance and max(n_subs_per_class) > min(n_subs_per_class):
+            # In case of self.shuffle == False, this is not very clean, since for each epoch we either always oversample the same first
             # samples in each sub or drop the same last samples in each sub when undersampling. But in case of self.shuffle_subs == True,
             # we randomly drop or oversample different samples in each epoch.
             if self.balance == 'undersample':
-                idx_per_sub = [sub_idx[:min(self.n_samples_per_class)] for sub_idx in idx_per_sub]
+                indices_per_class = [idxs[:min(n_subs_per_class)] for idxs in indices_per_class]
             elif self.balance == 'oversample':
-                idx_per_sub = [torch.cat([sub_idx, sub_idx[:self.class_sample_diffs[n]]], 0) for n, sub_idx in enumerate(idx_per_sub)]
-            
-        idxs_in_subbatches = torch.cat([
-            torch.cat([sub_idx[i:i + self.subbatch_size][None, :] for i in range(0, len(sub_idx), self.subbatch_size)
-                       if len(sub_idx[i:i + self.subbatch_size]) == self.subbatch_size], dim=0)
-            for sub_idx in idx_per_sub if len(sub_idx) > self.subbatch_size], dim=0)
+                class_subs_diff = [max(n_subs_per_class) - n_subs for n_subs in n_subs_per_class]
+                indices_per_class = [torch.cat([sub_idx, sub_idx[:class_subs_diff[n]]], 0) for n, sub_idx in enumerate(indices_per_class)]
         
-        return idxs_in_subbatches
-    
-    def __iter__(self):
-        idxs_in_subbatches = self.get_subbatched_sample_indexes()
+        indices = torch.cat(indices_per_class, 0) #merge indices from classes into one
         if self.shuffle:
-            g = torch.Generator()
-            g.manual_seed(self.epoch)
-            indices = torch.randperm(len(idxs_in_subbatches), generator=g).tolist()  # type: ignore
-        else:
-            indices = list(range(len(idxs_in_subbatches)))
+            # we need to shuffle once more after merging the indices of the classes!
+            indices = indices[torch.randperm(len(indices), generator=g)]
+            
         indices = indices[:self.total_size]
         indices = indices[self.rank:self.total_size:self.num_replicas]
-        idx_2 = 0 if self.no_subbatches else ...
-        subbatched_idx = idxs_in_subbatches[indices, idx_2].tolist()
+        
+        subbatched_idx = idxs_in_subbatches_per_class[indices, 0 if self.no_subbatches else ...].tolist()
         return iter(subbatched_idx)
         
     def __len__(self):
