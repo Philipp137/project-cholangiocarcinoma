@@ -15,5 +15,5 @@
 #SBATCH --time=00:00:5
 
 source .zshrc
-conda --version
-###srun python main.py
+conda activate ml4medical
+srun python hello_torch.py
