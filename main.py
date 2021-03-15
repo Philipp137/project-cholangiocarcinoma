@@ -6,12 +6,12 @@ import pytorch_lightning as pl
 
 random_seed = 42
 data_folder = 'D:/Arbeit/cholangiocarcinoma-data/CRC_KR/'
-num_classes = 2
+num_classes = 1
 relevance_class = False
-train_batch_size = 6
-train_subbatch_size = 64
+train_batch_size = 384
+train_subbatch_size = 0
 num_workers = 12
-val_batch_size = 8
+val_batch_size = 12
 val_subbatch_size = 96
 
 

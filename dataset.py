@@ -106,10 +106,12 @@ class TileImageDataset(datasets.ImageFolder):
             targets = targets[0]
         else:
             samples = torch.stack(samples, dim=0)
-            #targets = torch.tensor(targets)
-            targets = targets[0]
+            targets = torch.tensor(targets)
+            
         return samples, targets
-        
+    
+    #def get_tiles_from_slide(self, slide):
+    
         
 class TileSubBatchSampler(torch.utils.data.Sampler):
     def __init__(self, tile_image_dataset, subbatch_size, mode='class', shuffle=True, shuffle_subs=None, distributed=False,
@@ -192,14 +194,15 @@ class TileSubBatchSampler(torch.utils.data.Sampler):
             # In case of self.shuffle == False, this is not very clean, since for each epoch we either always oversample the same first
             # samples in each sub or drop the same last samples in each sub when undersampling. But in case of self.shuffle == True,
             # we randomly drop or oversample different samples in each epoch.
-
             if self.balance == 'undersample':
                 sample_len = min(n_subs_per_class)
             elif self.balance == 'oversample':
                 sample_len = max(n_subs_per_class)
+                
             n_runs = torch.ceil(torch.tensor([sample_len/n_subs for n_subs in n_subs_per_class]))
             sample_idxs = [(torch.arange(len_sub*n) % len_sub).long() for len_sub, n in zip(n_subs_per_class, n_runs)]
             if self.shuffle:
+                # shuffle wihtin classes. This is to make sure we oversample/drop different entries each epoch
                 sample_idxs = [idxs[torch.randperm(len(idxs), generator=g)] for idxs in sample_idxs]
             sample_idxs = [idxs[:sample_len] for idxs in sample_idxs]
 
@@ -213,7 +216,7 @@ class TileSubBatchSampler(torch.utils.data.Sampler):
             idxs_in_subbatches = idxs_in_subbatches[torch.randperm(idxs_in_subbatches.shape[0], generator=g), :]
             
         idxs_in_subbatches = idxs_in_subbatches[:self.total_size, :]
-        idxs_in_subbatches = idxs_in_subbatches[self.rank:self.total_size:self.num_replicas, , 0 if self.no_subbatches else ...].tolist()
+        idxs_in_subbatches = idxs_in_subbatches[self.rank:self.total_size:self.num_replicas, 0 if self.no_subbatches else ...].tolist()
         return iter(idxs_in_subbatches)
         
     def __len__(self):
