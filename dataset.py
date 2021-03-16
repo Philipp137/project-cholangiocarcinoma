@@ -110,8 +110,24 @@ class TileImageDataset(datasets.ImageFolder):
             
         return samples, targets
     
-    #def get_tiles_from_slide(self, slide):
-    
+    def get_tiles_from_slide(self, slide, tiles=None, cls=None):
+        parent_slides = self.parent_slide if cls is None or isinstance(slide, str) else self.parent_slide_per_class[cls]
+        slide = list(parent_slides.keys())[slide] if isinstance(slide, int) else slide
+        slide_tile_idxs = parent_slides[slide]
+        
+        if tiles and isinstance(tiles, int):
+            # pick n random tiles from slide:
+            tiles = torch.randint(len(slide_tile_idxs), tiles)
+            slide_tile_idxs = slide_tile_idxs[tiles]
+        
+        samples, targets = self[slide_tile_idxs]
+        
+        if self.tile_position:
+            pos = [self.tile_position[idx] for idx in slide_tile_idxs]
+            return samples, targets, pos
+        
+        return samples, targets
+        
         
 class TileSubBatchSampler(torch.utils.data.Sampler):
     def __init__(self, tile_image_dataset, subbatch_size, mode='class', shuffle=True, shuffle_subs=None, distributed=False,
