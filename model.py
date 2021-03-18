@@ -14,7 +14,7 @@ class Classifier(pl.LightningModule):
         self.prob_activation = torch.nn.Sigmoid() if num_classes == 1 else torch.nn.Softmax(dim=-1)
         self.classification_loss = torch.nn.BCEWithLogitsLoss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
         self.accuracy = pl.metrics.Accuracy()
-        self.auc = pl.metrics.AUROC(num_classes=max(num_classes, 2), average='weighted', pos_label=0, compute_on_step=False)
+        self.auc = pl.metrics.AUROC(num_classes=max(num_classes, 2), average='weighted', compute_on_step=False)
         self.confusion = pl.metrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False)
         if self.relevance_class:
             self.confusion_hard = pl.metrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False)
@@ -145,13 +145,14 @@ class Classifier(pl.LightningModule):
                 self.confusion_hard.reset()
         
             #TODO show heatmap for some slides
-        
+            
+    # for now, just do the same in test as in validation
     def test_step(self, batch, batch_idx):
-        x, y = batch
-        y_hat = self.classifier_net(x)
-        loss = F.cross_entropy(y_hat, y)
-        self.log('test_loss', loss)
-
+        return self.validation_step(batch, batch_idx)
+    
+    def test_epoch_end(self, outputs):
+        return self.validation_epoch_end(outputs)
+    
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
         scheduler = ReduceLROnPlateau(optimizer, patience=3)

@@ -29,25 +29,27 @@ class TileImageDataset(datasets.ImageFolder):
     def __init__(self, root_folder, mode, normalize=True, data_variant='CCC', get_parent_slide=None, get_tile_position=None):
         #TODO: Move Transforms out?
         if mode == 'train':
-            transofrms_list = [
+            transforms_list = [
                 transforms.RandomResizedCrop(224, scale=[0.8, 1], ratio=[5. / 6., 6. / 5.]),
                 transforms.RandomHorizontalFlip(),
                 transforms.RandomVerticalFlip(),
                 transforms.ToTensor(),
             ]
         else:
-            transofrms_list = [transforms.ToTensor()]
+            transforms_list = [transforms.ToTensor()]
 
         if normalize:
-            transofrms_list.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
-        image_transforms = transforms.Compose(transofrms_list)
+            transforms_list.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
+        image_transforms = transforms.Compose(transforms_list)
         super(TileImageDataset, self).__init__(root=os.path.join(root_folder, mode), transform=image_transforms, is_valid_file=is_valid_file)
         
         if get_parent_slide is None:
             if data_variant == 'CCC':
                 self.get_parent_slide = parent_slide_name_CCC
+                self.inverse_targets = self.class_to_idx['pos'] != 1 # This is necessary for ROC_AUC metric to work properly
             elif data_variant == 'MSIMSS':
                 self.get_parent_slide = parent_slide_name_MSIMSS
+                self.inverse_targets = self.class_to_idx['MSIMUT'] != 1 # This is necessary for ROC_AUC metric to work properly
         else:
             self.get_parent_slide = get_parent_slide
             
@@ -99,6 +101,7 @@ class TileImageDataset(datasets.ImageFolder):
                 sample = self.transform(sample)
             if self.target_transform is not None:
                 target = self.target_transform(target)
+                target = 1 - target if self.inverse_targets else target
             samples.append(sample)
             targets.append(target)
         if no_subbatch:
