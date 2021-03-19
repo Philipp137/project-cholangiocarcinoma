@@ -17,3 +17,5 @@ dependencies:
   - numpy
   - scipy
   - tensorboard
+  - cudatoolkit=11.1
+  - pytorch-lightning
