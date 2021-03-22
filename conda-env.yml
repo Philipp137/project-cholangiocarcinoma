@@ -12,10 +12,10 @@ dependencies:
   - pandas
   - libiconv
   - pytorch
-  - torchvision
+  - torchvision => 0.8.2
   - matplotlib
   - numpy
   - scipy
   - tensorboard
-  - cudatoolkit=11.1
+  - cudatoolkit => 10.0
   - pytorch-lightning
