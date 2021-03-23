@@ -13,11 +13,13 @@ class Classifier(pl.LightningModule):
         self.lr = lr
         self.prob_activation = torch.nn.Sigmoid() if num_classes == 1 else torch.nn.Softmax(dim=-1)
         self.classification_loss = torch.nn.BCEWithLogitsLoss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
-        self.accuracy = pl.metrics.Accuracy()
-        self.auc = pl.metrics.AUROC(num_classes=max(num_classes, 2), average='weighted', compute_on_step=False)
-        self.confusion = pl.metrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False)
+        self.accuracy = pl.metrics.Accuracy(dist_sync_on_step=True)
+        self.auc = pl.metrics.AUROC(num_classes=max(num_classes, 2), average='weighted', compute_on_step=False, dist_sync_on_step=True)
+        self.confusion = pl.metrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False,
+                                                    dist_sync_on_step=True)
         if self.relevance_class:
-            self.confusion_hard = pl.metrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False)
+            self.confusion_hard = pl.metrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False,
+                                                             dist_sync_on_step=True)
 
     def forward(self, x):
         # use forward for inference/predictions
@@ -63,7 +65,7 @@ class Classifier(pl.LightningModule):
             logits = (logits[..., :-1] * relevance).sum(-2) / torch.clip(logits.shape[-2] - (1 - relevance).sum(-2), 1)
             
         return logits
-    
+
     def training_step(self, batch, batch_idx):
         x, y = batch
         
@@ -79,8 +81,8 @@ class Classifier(pl.LightningModule):
         logits = logits.squeeze(-1) if self.num_classes == 1 else logits
         loss = self.classification_loss(logits, y)
         
-        self.log('train_loss', loss, on_epoch=True, )
-        self.log('train_acc', self.accuracy(self.prob_activation(logits), y.long()), on_epoch=True, prog_bar=False)
+        self.log('train_loss', loss, on_epoch=True, sync_dist=True, )
+        self.log('train_acc', self.accuracy(self.prob_activation(logits), y.long()), on_epoch=True, prog_bar=False, sync_dist=True)
         return loss
         
     def validation_step(self, batch, batch_idx):
@@ -99,10 +101,10 @@ class Classifier(pl.LightningModule):
         if not self.trainer.running_sanity_check:
             name_extension = '_soft' if self.relevance_class else ''
             #self.log('valid_loss'+name_extension, loss_soft, on_step=True, prog_bar=False)
-            self.log('valid_loss'+name_extension, loss_soft, prog_bar=True)
+            self.log('valid_loss'+name_extension, loss_soft, prog_bar=True, sync_dist=True)
             acc = self.accuracy(self.prob_activation(logits_soft), y.long())
             #self.log('valid_acc'+name_extension, acc_soft, on_step=True, prog_bar=False)
-            self.log('valid_acc'+name_extension, acc, prog_bar=True)
+            self.log('valid_acc'+name_extension, acc, prog_bar=True, sync_dist=True)
             self.auc(self.prob_activation(logits_soft), y.long())
             
             self.confusion(self.prob_activation(logits_soft), y.long())
@@ -113,19 +115,19 @@ class Classifier(pl.LightningModule):
                 loss_hard = self.classification_loss(logits_hard, y)
         
                 #self.log('valid_loss_hard', loss_hard, on_step=True, prog_bar=False)
-                self.log('valid_loss_hard', loss_hard, prog_bar=False, logger=False)
+                self.log('valid_loss_hard', loss_hard, prog_bar=False, logger=False, sync_dist=True)
                 acc_hard = self.accuracy(self.prob_activation(logits_hard), y.long())
                 #self.log('valid_acc_hard', acc_hard, on_step=True, prog_bar=False)
-                self.log('valid_acc_hard', acc_hard, prog_bar=False, logger=False)
+                self.log('valid_acc_hard', acc_hard, prog_bar=False, logger=False, sync_dist=True)
                 auc_hard = self.auc(self.prob_activation(logits_soft), y.long())
-                self.log('valid_auc_hard', auc_hard, prog_bar=True)
+                self.log('valid_auc_hard', auc_hard, prog_bar=True, sync_dist=True)
                 self.confusion_hard(self.prob_activation(logits_hard), y.long())
         
     def validation_epoch_end(self, outputs):
         if not self.trainer.running_sanity_check:
             confmat = self.confusion.compute()
             auc = self.auc.compute()
-            self.log('valid_auc', auc, prog_bar=True)
+            self.log('valid_auc', auc, prog_bar=True, sync_dist=True)
             
             name_extension = '_soft' if self.relevance_class else ''
             self.logger.experiment.add_text('confusion'+name_extension,
