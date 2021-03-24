@@ -2,7 +2,9 @@ import torch
 import torch.distributed as dist
 import os
 from torchvision import transforms, datasets
+from torch.utils.data import DataLoader
 from pathlib import Path
+import pytorch_lightning as pl
 
 def is_valid_file(fpath):
     return fpath.lower().endswith('.png')
@@ -244,3 +246,47 @@ class TileSubBatchSampler(torch.utils.data.Sampler):
     def set_epoch(self, epoch):
         self.epoch = epoch
     
+    
+class DataModule(pl.LightningDataModule):
+        def __init__(self,
+                     root_folder,
+                     data_variant,
+                     train_batch_size,
+                     val_batch_size,
+                     train_subbatch_size,
+                     val_subbatch_size,
+                     train_subbatch_mode='class',
+                     val_subbatch_mode='slide',
+                     train_balance=None,
+                     val_balance=None,
+                     distributed=False,
+                     num_workers=1,
+                     persistent_workers=False,
+                     ):
+            super(DataModule, self).__init__()
+            normalize = data_variant != 'MSIMSS'
+            self.train_dataset = TileImageDataset(root_folder=root_folder, mode='train', data_variant='MSIMSS', normalize=normalize)
+            self.val_dataset = TileImageDataset(root_folder=root_folder, mode='val', data_variant='MSIMSS', normalize=normalize)
+            self.train_batch_size = train_batch_size
+            self.val_batch_size = val_batch_size
+            self.train_subbatch_size = train_subbatch_size
+            self.val_subbatch_size = val_subbatch_size
+            self.train_subbatch_mode = train_subbatch_mode
+            self.val_subbatch_mode = val_subbatch_mode
+            self.train_balance = train_balance
+            self.val_balance = val_balance
+            self.distributed = distributed
+            self.num_workers = num_workers
+            self.persistent_workers = persistent_workers
+            
+        def train_dataloader(self):
+            sampler = TileSubBatchSampler(self.train_dataset, subbatch_size=self.train_subbatch_size, mode=self.train_subbatch_mode,
+                                          shuffle=True, balance=self.train_balance, distributed=self.distributed)
+            return DataLoader(self.train_dataset, batch_size=self.train_batch_size, sampler=sampler, num_workers=self.num_workers,
+                              persistent_workers=self.persistent_workers)
+        
+        def val_dataloader(self):
+            sampler = TileSubBatchSampler(self.val_dataset, subbatch_size=self.val_subbatch_size, mode=self.val_subbatch_mode,
+                                          shuffle=False, balance=self.val_balance, distributed=self.distributed)
+            return DataLoader(self.val_dataset, batch_size=self.val_batch_size, sampler=sampler, num_workers=self.num_workers,
+                              persistent_workers=self.persistent_workers)
