@@ -157,6 +157,9 @@ class Classifier(pl.LightningModule):
     
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
-        scheduler = ReduceLROnPlateau(optimizer, patience=3)
-        name_extension = '_soft' if self.relevance_class else ''
-        return dict(optimizer=optimizer, lr_scheduler=scheduler, monitor='valid_loss'+name_extension)
+        
+        # scheduler = ReduceLROnPlateau(optimizer, patience=3)
+        # name_extension = '_soft' if self.relevance_class else ''
+        # return dict(optimizer=optimizer, lr_scheduler=scheduler, monitor='valid_loss'+name_extension)
+        
+        return optimizer
