@@ -265,8 +265,8 @@ class DataModule(pl.LightningDataModule):
                      ):
             super(DataModule, self).__init__()
             normalize = data_variant != 'MSIMSS'
-            self.train_dataset = TileImageDataset(root_folder=root_folder, mode='train', data_variant='MSIMSS', normalize=normalize)
-            self.val_dataset = TileImageDataset(root_folder=root_folder, mode='val', data_variant='MSIMSS', normalize=normalize)
+            self.train_dataset = TileImageDataset(root_folder=root_folder, mode='train', data_variant=data_variant, normalize=normalize)
+            self.val_dataset = TileImageDataset(root_folder=root_folder, mode='val', data_variant=data_variant, normalize=normalize)
             self.train_batch_size = train_batch_size
             self.val_batch_size = val_batch_size
             self.train_subbatch_size = train_subbatch_size
