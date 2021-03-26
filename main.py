@@ -5,6 +5,7 @@ import pytorch_lightning as pl
 import json
 import torch
 import argparse
+import os
 
 
 if __name__ =="__main__":
@@ -13,7 +14,7 @@ if __name__ =="__main__":
     parser.add_argument('-n', '--num_nodes', type=int, help='Number of nodes to use on te cluster', default=None)
     parser.add_argument('-c', '--config', type=str, help='Name of config file to use (including path if in a different folder)', default=None)
     args = parser.parse_args()
-    config_name = args.config or 'config.json'
+    config_name = args.config or os.path.dirname(os.path.abspath(__file__)) + '/config.json'
     
     with open(config_name) as file:
         config = json.load(file)
@@ -23,7 +24,7 @@ if __name__ =="__main__":
     num_workers = args.num_workers or trainer_conf['num_workers']
     num_nodes = args.num_nodes or trainer_conf['num_nodes']
     data_folder = config['data_root_paths'][trainer_conf['cluster']] + config['data_folder'][trainer_conf['data_variant']]
-    print(num_workers, num_nodes)
+    
     distributed = torch.cuda.device_count() > 1 or num_nodes > 1
     pl.seed_everything(trainer_conf['random_seed'])
     data_module = DataModule(
