@@ -1,0 +1,10 @@
+##################################################
+#   Cluster Aliases SLURM
+##################################################
+# see all your jobs 
+# put an --start behind to see when the job starts
+alias myjobs="squeue -u $USER"
+# see available gpus
+alias gpus="sinfo -p gpu"
+# submit your job using submit myjob.sh 
+alias submit=sbatch

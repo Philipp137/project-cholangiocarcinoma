@@ -138,4 +138,8 @@ dmypy.json
 *.jpeg
 
 # log folders
-/lightning_logs/
+lightning_logs/
+
+# sbatch
+ml4medical/sbatch/mygpujob.sh
+CCC-*.out
