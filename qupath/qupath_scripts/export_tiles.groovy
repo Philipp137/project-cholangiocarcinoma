@@ -20,7 +20,6 @@ double requestedPixelSize = 1.0
 // Convert to downsample
 double downsample = 4//requestedPixelSize / imageData.getServer().getPixelCalibration().getAveragedPixelSize()
 
-
 static double tile_white_fraction(img, width)
 {       
         //new ImagePlus("Image", img).show() // prints the image
@@ -47,7 +46,8 @@ for (annotation in getAnnotationObjects()) {
     roi = annotation.getROI()
     def tile = RegionRequest.createInstance(imageData.getServerPath(),downsample,roi)
     String tiletype = annotation.getParent().getPathClass()
-    if (!tiletype.equals("Tumor")){ continue } // continue to next tile if it is not a tumor tile
+//    if (!tiletype.equals("Tumor")){ continue } // continue to next tile if it is not a tumor tile
+    if (!roi.getRoiName().equals("Rectangle")){ continue }
     if (i1 >0){
         if(tile.x < min_x){ min_x = tile.x }
         if(tile.y < min_y){ min_y = tile.y }
@@ -71,13 +71,14 @@ int i2 = 0
 println "Exporting Tiles: "
 for (annotation in getAnnotationObjects()) {
     String tiletype = annotation.getParent().getPathClass()
-    if (!tiletype.equals("Tumor")){ continue } // continue to next tile if it is not a tumor tile
+    //if (!tiletype.equals("Tumor")){ continue } // continue to next tile if it is not a tumor tile
     //runPlugin('qupath.imagej.detect.tissue.PositivePixelCounterIJ', '{"downsampleFactor": 1,  "gaussianSigmaMicrons": 2.0,  "thresholdStain1": 9.0,  "thresholdStain2": 0.1,  "addSummaryMeasurements": true,  "clearParentMeasurements": true,  "appendDetectionParameters": false,  "legacyMeasurements0.1.2": false}');
     
     // get region of interest in this case its an rectangle in the tumor part
     roi = annotation.getROI()
     // tile_name is something like "Tile 245"
     tile_name = annotation.getName()
+    if (!roi.getRoiName().equals("Rectangle")){ continue }
     // Tile is just a rectangle 
     def tile = RegionRequest.createInstance(imageData.getServerPath(),downsample,roi)
     def img = server.readBufferedImage(tile)
@@ -102,7 +103,21 @@ for (annotation in getAnnotationObjects()) {
     //print("wrote " + filename)
 }
 
+// finally we do some garbage collection in order
+// to not kill our selfs
+Thread.sleep(100)
+// Try to reclaim whatever memory we can, including emptying the tile cache
+javafx.application.Platform.runLater {
+    getCurrentViewer().getImageRegionStore().cache.clear()
+    System.gc() // gc for garbage collection<
+}
+Thread.sleep(100)
+
+
 print 'done!'
+
+
+
 
 
 /// qupath commands:
