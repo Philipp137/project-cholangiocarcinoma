@@ -15,7 +15,6 @@
 #SBATCH --time=02:00:00
 
 
-echo "cpus per task:" $SBATCH_CPUS_PER_TASK
 source ~/.zshrc
 conda activate ml4medical
 srun python ../../main.py
