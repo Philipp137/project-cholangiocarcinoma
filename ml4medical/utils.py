@@ -2,8 +2,14 @@ import csv
 import os
 import shutil
 import numpy as np
+from pathlib import Path
 
-root_path = 'D:/Arbeit/med_data/CCC/'
+
+
+def get_project_root() -> Path:
+    return str(Path(__file__).parent.parent)
+
+root_path = get_project_root()
 data_path = root_path + 'CCC/'
 csv_path = root_path + 'CCC-labels.csv'
 
@@ -93,3 +99,4 @@ def train_val_split_slides(data_path, split_fraction, classes, balanced_val_set=
                 shutil.move(data_path + cls + '/' + slides_in_cls[cls][slide_idx],
                             data_path + 'val/' + cls + '/' + slides_in_cls[cls][slide_idx])
             shutil.move(data_path + cls, data_path + 'train/' + cls)
+
