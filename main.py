@@ -1,6 +1,6 @@
-from net import ResNet
-from model import Classifier
-from dataset import DataModule
+from ml4medical.net import ResNet
+from ml4medical.model import Classifier
+from ml4medical.dataset import DataModule
 import pytorch_lightning as pl
 import json
 import torch
