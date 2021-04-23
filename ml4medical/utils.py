@@ -33,11 +33,11 @@ def sort_into_classes_by_csv(data_path, csv_path):
                 shutil.move(data_path + slide, data_path + 'missing/' + slide)
 
 
-def train_val_split_slides(data_path, split_fraction, classes, balanced_val_set=True):
+def train_val_split_slides(data_path, classes, split_fraction=0.125, rand_seed=0, balanced_val_set=True):
     """
     pick random slides, so that the split_fraction is approximately met for the number of tiles and sort them into train and val folder
     """
-    
+    np.random.seed(rand_seed)
     data_path = data_path + '/' if not data_path.endswith('/') else data_path
     n_tiles_in_slide = dict()
     n_tiles_in_class = dict()
