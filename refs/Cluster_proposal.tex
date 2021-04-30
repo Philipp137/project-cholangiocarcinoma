@@ -1,0 +1,180 @@
+\documentclass[12pt]{article}
+\usepackage{relsize}
+\usepackage{listings}
+\usepackage{float}
+\usepackage{pifont}
+\usepackage{parskip}
+\usepackage{pgfgantt}
+
+\title{
+Application for a Computing Time Project on the RWTH Compute Cluster\\[0.2em]\smaller{}New project proposal \texttt{ICCA1}\\Period: 06.2021 – 05.2022\\Determination of nodal status in intrahepatic cholangiocarcinoma by deep learning – A retrospective multicentric analysis }
+
+%\author{Name of the author}
+
+\begin{document}
+\maketitle
+~\\
+\begin{table}[H]
+  \begin{center}
+    \begin{tabular}{p{5cm} p{10cm}}
+      \textbf{Principal investigator:} &  Jan Bednarsch\\
+			\textbf{Technical contact:} & Philipp Krah, Steffen Buechholz\\
+			\textbf{Project contributors:} & Jan Bednarsch, Steffen Buechholz, Lara Heij, Philipp Krah, Ulf Neumann
+    \end{tabular}
+  \end{center}
+\end{table}
+
+\newpage
+% 
+% \begin{abstract}
+% Please give a short abstract of your project. NOTE: This abstract might be published on the IT Center webpage after the approval of the compute time.
+% \end{abstract}
+
+\section{Project Description}
+
+
+\subsection{Introduction}
+Cholangiocellular carcinoma (CCA) is the second most common primary liver cancer and usually diagnosed at advanced disease stages \cite{b1,b2}. CCAs are categorized with respect to their anatomical location within the biliary system as intrahepatic CCA (iCCA), perihilar CCA (pCCA) or distal CCA \cite{b1}. Radical surgical resections in combination with extended lymphadenectomy has evolved as the mainstay of therapy in patients presenting with localized disease \cite{b3,b4,b5}. In case of iCCA and pCCA, this translates into the requirement of major hepatectomy and commonly vascular resection and reconstruction at the liver hilum due to the distinct unfavorable anatomic location in pCCA and often large tumor mass in iCCA \cite{b6,b7,b8,b9,b10}. As major liver resection is associated with significant perioperative morbidity and mortality, sophisticated patient selection is of clinical importance in these individuals \cite{b6, b11, b12}.
+
+Lymph node involvement (nodal status) is independently associated with an impaired overall survival after curative-intent surgery and constitutes a known prognostic factor for adverse clinical outcome in iCCA \cite{b2, b13}. Currently, there is no diagnostic modality available evaluating nodal status preoperatively with high sensitivity and specificity \cite{b14}. Given the significant perioperative morbidity and mortality in operative treatment as well as the limited oncological prognosis after surgery in case of the presence of nodal metastases, appropriate methods to evaluate nodal status preoperatively are of upmost scientific importance and would facilitate clinical management of iCCA patients. Therefore, the aim of the interdisciplinary project is to evaluate the ability of artificial intelligence (AI) to predict nodal status in iCCA based on microscopic probe of the primary tumor. As iCCA does usually present as large tumor mass within the liver, tumor tissue is usually easily obtainable by diagnostic ultrasound-guided biopsy. A sufficient prediction of actual nodal status by deep learning based on this preoperatively available tumor sample would subsequently be of major importance for clinical decision-making in these patients.
+
+\subsection{Preliminary Work}
+ICCA is a major research priority of the Department of Surgery and Transplantation of the RWTH Aachen University Hospital. Our research group has subsequently published several high-ranking publications in internationally renowned journals \cite{b2, b7, b15,b16,b17,b18,b19,b20,b21}. Further, our group has sufficiently collaborated in AI projects and is currently investigating various deep learning research questions
+\cite{b22}.
+
+In preparation for this project, data of >100 patients who underwent liver resection for ICCA from 2010 to 2019 at the Department of Surgery and Transplantation was collected and preliminarily analyzed. Further, tumor tissue was obtained from the archive of the local Institute of Pathology, regularly processed and stained with hematoxylin and eosin (H\&E). The created slides have further already been digitalized.
+
+The project was proposed and discussed with several University Hospitals with a comparable research focus. A formal agreement of collaboration was given by the Universities of Mainz, Regensburg, Hannover and Tübingen.
+The study will be conducted at the UH-RWTH in accordance with the requirements of the current version of the Declaration of Helsinki and the good clinical practice guidelines (ICH-GCP). The project was also approved by the local Institutional Review Board of the RWTH-Aachen University (EK 489/20).
+
+
+\subsection{Project Details}
+The primary aim of this project is to evaluate the ability of deep learning to predict nodal status based on one H\&E-stained tumor slide in iCCA (AIM 1). Secondary, a heat map analysis will reveal tumor regions which are associated with nodal status and therefore allow further basic preclinical analyses giving insight into the tumorigenesis of iCCA (AIM 2).
+
+The project will be carried out by a multidisciplinary team supported by collaborators as described below:
+
+\textbf{Core project group:}
+\begin{table}[H]
+	\footnotesize
+  \begin{center}
+    \begin{tabular}{p{4cm} p{11cm}}
+			Dr. Jan Bednarsch	&	Department of Surgery and Transplantation, RWTH Aachen\\
+			Dr. Lara Heij			&		Institute of Pathology, RWTH Aachen\\
+			Prof. Dr. Ulf Neumann&	Department of Surgery and Transplantation, RWTH Aachen\\
+			Philipp Krah, M.Sc.	&		Institute of Mathematics, TU Berlin\\
+			Steffen Buchholz, M.Sc.	&	Institute of Fluiddynamics, TU Berlin\\
+\end{tabular}
+\end{center}
+\end{table}
+
+
+\textbf{Collaborators}
+\begin{table}[H]
+	\footnotesize
+  \begin{center}
+    \begin{tabular}{p{4cm} p{11cm}}
+			Prof. Dr. Hauke Lang			&Department of Surgery and Transplantation, University Mainz\\
+			Prof. Dr. Beate Straub 		&Institute of Pathology, University Mainz \\
+			Prof. Dr. Hans Schlitt		&Department of Surgery and Transplantation, University Regensburg\\
+			Prof. Dr. Matthias Evert	&Institute of Pathology, University Regensburg\\
+			Prof. Dr. J. Klempnauer		&Department of Surgery and Transplantation, University Hannover\\
+			Prof. Dr. Hans Kreipe			&Institute of Pathology, University Hannover\\
+			Prof. Dr. Silvio Nadalin	&Department of Surgery and Transplantation, University Tübingen\\
+			Prof. Dr. Falko Fend			&Institute of Pathology, University Tübingen
+    \end{tabular}
+  \end{center}
+\end{table}
+
+The estimated project duration is one year. As the RWTH Aachen cohort is already digitalized, code development will be based on this currently available dataset. The digitalization of the tumors slides of the collaborators is expected to be finished by October 2021. Thus, the full dataset will be analyzed between October and December 2021 (Figure \ref{fig:chart}).
+
+\begin{figure}[htp]
+\begin{ganttchart}[y unit title=0.6cm,
+y unit chart=0.5cm,
+hgrid,vgrid,
+	time slot format=isodate-yearmonth,
+	time slot unit=month,
+	title height=.75, title top shift=0,
+	bar height=0.6]{2020-09}{2022-5}
+	\gantttitlecalendar{year, month} \\
+	\ganttbar[bar/.append style={fill=blue}]{Digitalisation RWTH Cohort}{2020-09}{2020-12}\\
+	\ganttbar[bar/.append style={fill=purple}]{Code Development}{2021-01}{2021-07}\\
+	\ganttbar[bar/.append style={fill=purple}]{Analysis RWTH Cohort}{2021-06}{2021-10}\\
+	\ganttbar[bar/.append style={fill=blue}]{Digitalisation Collaborators}{2021-01}{2021-10}\\
+	\ganttbar[bar/.append style={fill=purple}]{Analysis Combined Cohort}{2021-11}{2022-02}\\
+	\ganttbar[bar/.append style={fill=green}]{Publication Preparation}{2022-01}{2022-05}
+	\ganttlink{elem0}{elem1}
+	\ganttlink{elem0}{elem2}
+	\ganttlink{elem3}{elem4}
+\end{ganttchart}
+\caption{Chart of the workplan.}
+\label{fig:chart}
+\end{figure}
+
+\subsection{Description of Methods and Algorithms}
+Describe the scientific and numerical methods and algorithms you are planning to use/improve/develop. (max. 1/2 page).
+
+\subsection{Code Performance}
+For the estimation of the required resources we
+
+
+Elaborate which kind of supercomputer is suitable for your proposed project and why. Include information about: (max. 1 page):
+\begin{itemize}
+	\item which code will be used and describe its suitability for parallel computers: (scaling plots and table with speedup results for runs with a typical problem size of the planned project)
+	\item describe architecture, machine/system name, and problem size used for the scaling plots
+\end{itemize}
+
+\subsection{Estimated resources on the RWTH Compute Cluster}
+Outline the amount of resources you request for the current granting period and describe your requirements as filled in the submission form (max. 1/2 page).\\
+If you have any special resource requirements (IO, memory, CPU, networks, others) , please provide a detailed description here.
+
+\begin{thebibliography}{22}
+\bibitem{b1}
+1.	Blechacz B, Komuta M, Roskams T, Gores GJ. \textit{Clinical diagnosis and staging of cholangiocarcinoma}. Nature reviews Gastroenterology \& hepatology. 2011;8(9):512-22.
+\bibitem{b2}
+2.	Lurje G, Bednarsch J, Czigany Z, Lurje I, Schlebusch IK, Boecker J, et al. \textit{The prognostic role of lymphovascular invasion and lymph node metastasis in perihilar and intrahepatic cholangiocarcinoma}. European journal of surgical oncology : the journal of the European Society of Surgical Oncology and the British Association of Surgical Oncology. 2019;45(8):1468-78.
+\bibitem{b3}
+3.	Neuhaus P, Jonas S, Bechstein WO, Lohmann R, Radke C, Kling N, et al. \textit{Extended resections for hilar cholangiocarcinoma}. Annals of surgery. 1999;230(6):808-18; discussion 19.
+\bibitem{b4}
+4.	Neuhaus P, Thelen A, Jonas S, Puhl G, Denecke T, Veltzke-Schlieker W, et al. \textit{Oncological superiority of hilar en bloc resection for the treatment of hilar cholangiocarcinoma}. Annals of surgical oncology. 2012;19(5):1602-8.
+\bibitem{b5}
+5.	Nagino M, Ebata T, Yokoyama Y, Igami T, Sugawara G, Takahashi Y, et al. \textit{Evolution of surgical treatment for perihilar cholangiocarcinoma: a single-center 34-year review of 574 consecutive resections}. Annals of surgery. 2013;258(1):129-40.
+\bibitem{b6}
+6.	Bednarsch J, Czigany Z, Lurje I, Tacke F, Strnad P, Ulmer TF, et al. \textit{Left- versus right-sided hepatectomy with hilar en-bloc resection in perihilar cholangiocarcinoma}. HPB : the official journal of the International Hepato Pancreato Biliary Association. 2019.
+\bibitem{b7}
+7.	Bednarsch J, Czigany Z, Lurje I, Strnad P, Bruners P, Ulmer TF, et al. \textit{The role of ALPPS in intrahepatic cholangiocarcinoma}. Langenbeck's archives of surgery / Deutsche Gesellschaft fur Chirurgie. 2019;404(7):885-94.
+\bibitem{b8}
+8.	Endo I, Gonen M, Yopp AC, Dalal KM, Zhou Q, Klimstra D, et al. \textit{Intrahepatic cholangiocarcinoma: rising frequency, improved survival, and determinants of outcome after resection}. Annals of surgery. 2008;248(1):84-96.
+\bibitem{b9}
+9.	Ribero D, Pinna AD, Guglielmi A, Ponti A, Nuzzo G, Giulini SM, et al. \textit{Surgical Approach for Long-term Survival of Patients With Intrahepatic Cholangiocarcinoma: A Multi-institutional Analysis of 434 Patients}. Archives of surgery. 2012;147(12):1107-13.
+\bibitem{b10}
+10.	Lang H, Sotiropoulos GC, Fruhauf NR, Domland M, Paul A, Kind EM, et al. \textit{Extended hepatectomy for intrahepatic cholangiocellular carcinoma (ICC): when is it worthwhile? Single center experience with 27 resections in 50 patients over a 5-year period}. Annals of surgery. 2005;241(1):134-43.
+\bibitem{b11}
+11.	Miyazaki M, Kato A, Ito H, Kimura F, Shimizu H, Miyazaki O, et al. \textit{Combined vascular resection in operative resection for hilar cholangiocarcinoma: does it work or not? Surgery}. 2007;141(5):581-8.
+\bibitem{b12}
+12.	Nagino M, Nimura Y, Nishio H, Ebata T, Igami T, Matsushita M, et al. \textit{Hepatectomy with simultaneous resection of the portal vein and hepatic artery for advanced perihilar cholangiocarcinoma: an audit of 50 consecutive cases}. Annals of surgery. 2010;252(1):115-23.
+\bibitem{b13}
+13.	Jonas S, Thelen A, Benckert C, Biskup W, Neumann U, Rudolph B, et al. \textit{Extended liver resection for intrahepatic cholangiocarcinoma: A comparison of the prognostic accuracy of the fifth and sixth editions of the TNM classification}. Annals of surgery. 2009;249(2):303-9.
+\bibitem{b14}
+14.	Hu JH, Tang JH, Lin CH, Chu YY, Liu NJ. \textit{Preoperative staging of cholangiocarcinoma and biliary carcinoma using 18F-fluorodeoxyglucose positron emission tomography: a meta-analysis}. Journal of investigative medicine : the official publication of the American Federation for Clinical Research. 2018;66(1):52-61.
+\bibitem{b15}
+15.	Bednarsch J, Czigany Z, Heij LR, Luedde T, van Dam R, Lang SA, et al. \textit{Bacterial bile duct colonization in perihilar cholangiocarcinoma and its clinical significance}. Scientific reports. 2021;11(1):2926.
+\bibitem{b16}
+16.	Bednarsch J, Czigany Z, Heise D, Lang SA, Olde Damink SWM, Luedde T, et al. \textit{Leakage and Stenosis of the Hepaticojejunostomy Following Surgery for Perihilar Cholangiocarcinoma}. J Clin Med. 2020;9(5).
+\bibitem{b17}
+17.	Bednarsch J, Czigany Z, Lurje I, Amygdalos I, Strnad P, Halm P, et al. \textit{Insufficient future liver remnant and preoperative cholangitis predict perioperative outcome in perihilar cholangiocarcinoma}. HPB : the official journal of the International Hepato Pancreato Biliary Association. 2021;23(1):99-108.
+\bibitem{b18}
+18.	Bednarsch J, Czigany Z, Lurje I, Tacke F, Strnad P, Ulmer TF, et al. \textit{Left- versus right-sided hepatectomy with hilar en-bloc resection in perihilar cholangiocarcinoma}. HPB : the official journal of the International Hepato Pancreato Biliary Association. 2020;22(3):437-44.
+\bibitem{b19}
+19.	Lurje G, Bednarsch J, Roderburg C, Trautwein C, Neumann UP. \textit{Intrahepatic cholangiocarcinoma - current perspectives and treatment algorithm}. Der Chirurg; Zeitschrift fur alle Gebiete der operativen Medizen. 2018;89(11):858-64.
+\bibitem{20}
+20.	Bednarsch J, Trauwein C, Neumann UP, Ulmer TF. \textit{Complication management after bile duct surgery}. Der Chirurg; Zeitschrift fur alle Gebiete der operativen Medizen. 2020;91(1):29-36.
+\bibitem{b21}
+21.	Bednarsch J, Neumann UP, Lurje G. \textit{Reply to: Does lymphovascular invasion really associate with decreased overall survival for patients with resected cholangiocarcinoma?} European journal of surgical oncology : the journal of the European Society of Surgical Oncology and the British Association of Surgical Oncology. 2019;45(8):1513-4.
+\bibitem{b22}
+22.	Echle A, Grabsch HI, Quirke P, van den Brandt PA, West NP, Hutchins GGA, et al. \textit{Clinical-Grade Detection of Microsatellite Instability in Colorectal Tumors by Deep Learning}. Gastroenterology. 2020;159(4):1406-16 e11.
+\end{thebibliography}
+%\addcontentsline{toc}{section}{References}
+%\bibliographystyle{abbrv}
+%\bibliography{main}
+
+\end{document}
