@@ -5,6 +5,8 @@
 \usepackage{pifont}
 \usepackage{parskip}
 \usepackage{pgfgantt}
+\usepackage{cleveref}
+ \usepackage{booktabs}
 
 \title{
 Application for a Computing Time Project on the RWTH Compute Cluster\\[0.2em]\smaller{}New project proposal \texttt{ICCA1}\\Period: 06.2021 – 05.2022\\Determination of nodal status in intrahepatic cholangiocarcinoma by deep learning – A retrospective multicentric analysis }
@@ -25,7 +27,7 @@ Application for a Computing Time Project on the RWTH Compute Cluster\\[0.2em]\sm
 \end{table}
 
 \newpage
-% 
+%
 % \begin{abstract}
 % Please give a short abstract of your project. NOTE: This abstract might be published on the IT Center webpage after the approval of the compute time.
 % \end{abstract}
@@ -111,21 +113,48 @@ hgrid,vgrid,
 \end{figure}
 
 \subsection{Description of Methods and Algorithms}
-We will train different deep neural networks to evaluate and compare them on their ability to predict the nodal status based on H\&E-stained tumor slide in iCCA. The results will be evaluated on an unseen portion of the data set (test set). We will use known architectures from Computer Vision like ResNet and - depending on the results - potentially more recent models like Visual Transformers \cite{b23, b24}. The parameters of each network will be optimized using a variant of stochastic gradient descent on mini batches of data. Each mini batch consists of a number of relatively small image patches/tiles of a given resolution of 256x256 (or 224x224) that are extracted randomly from the tumor slides. This is necessary, as the whole slide images are far to too large to process at once (each slide has a size of 0.5Gb - 1Gb). A classifier head will predict the nodal status of each tile independently. The target for loss computation is taken from the known status of the whole slide image. For each model, a hyper parameter search will be conducted. For each hyper parameter set, each model will be trained for approximately 100 epoches (though early stopping mechanism will be utilised). The models are implemented using the pytorch-lightning API, which works on top of the pytorch library \cite{b25, b26}. 
+We will train different deep neural networks to evaluate and compare them on their ability to predict the nodal status based on H\&E-stained tumor slide in iCCA. The results will be evaluated on an unseen portion of the data set (test set). We will use known architectures from Computer Vision like ResNet and - depending on the results - potentially more recent models like Visual Transformers \cite{b23, b24}. The parameters of each network will be optimized using a variant of stochastic gradient descent on mini batches of data. Each mini batch consists of a number of relatively small image patches/tiles of a given resolution of $256\times 256$ (or $224 \times 224$) that are extracted randomly from the tumor slides. This is necessary, as the whole slide images are far too large to process at once (each slide has a size of 0.5Gb - 1Gb). A classifier head will predict the nodal status of each tile independently. The target for loss computation is taken from the known status of the whole slide image. For each model, a hyper parameter search will be conducted. For each hyper parameter set, each model will be trained for approximately 100 epoches (though early stopping mechanism will be utilized). The models are implemented using the pytorch-lightning API, which works on top of the pytorch library \cite{b25, b26}.
 
 \subsection{Code Performance}
-For the estimation of the required resources we
 
+The estimation of the GPU time on the \texttt{Tesla V100, lgoin18-g} architecture,
+is based on a single node performance test on a fraction of our data.
+The tests include 10 Gb of data with 96658 samples. For the train-test policy
+we choose 63-37\% split of the data and measure the average GPU time per sample.
+For an optimal performance we limit the batch size to the maximal size one computation node can handle (here: $B=800$) before the memory overflows. We remark that the optimal batch size is dependent on the architecture used for the network (here: \texttt{RESNET18}),
+but the difference between varying architectures should be small.
+With this setting we train over several epochs and divide the wall-time by the number
+of epochs and the number of samples $B$ per epoch. We result in an average of about $t_\mathrm{sample}=2$ seconds for one sample.
 
-Elaborate which kind of supercomputer is suitable for your proposed project and why. Include information about: (max. 1 page):
-\begin{itemize}
-	\item which code will be used and describe its suitability for parallel computers: (scaling plots and table with speedup results for runs with a typical problem size of the planned project)
-	\item describe architecture, machine/system name, and problem size used for the scaling plots
-\end{itemize}
+The data set of the RWTH-Aachen Cohort includes $N=450000$ samples. From previous studies
+we assume to converge within $E=500$ epochs to a trained network, which explains the amount of
+GPU hours listed in \cref{tabl:resource} for the RWTH-Aachen Cohort. We assume to have the same amount of data available from the collaborators. Therefore the combined analysis
+is estimated to include both datasets.
 
 \subsection{Estimated resources on the RWTH Compute Cluster}
-Outline the amount of resources you request for the current granting period and describe your requirements as filled in the submission form (max. 1/2 page).\\
-If you have any special resource requirements (IO, memory, CPU, networks, others) , please provide a detailed description here.
+
+The amount of resources needed is listed in \cref{tabl:resource}
+
+\begin{table}
+	\centering
+	\begin{tabular}{l l l}
+		\toprule
+		Quantity & Amount \\
+		\midrule
+		\textbf{Memory} (\texttt{work}) & 500 Gb \\
+		\hline
+		\textbf{GPU time} \\
+		development & 125k GPU/h  \\
+		RWTH Cohort & 125k GPU/h \\
+		Combined Analysis & 250k GPU/h \\
+		\hline
+		\hline
+		\textbf{total} &  500k GPU/h\\
+		\bottomrule
+	\end{tabular}
+	\caption{Summary of the estimated resources. The GPU time is estimated and applied for the Tesla \texttt{V100} Graphiccards}
+	\label{tabl:resource}
+\end{table}
 
 \begin{thebibliography}{22}
 \bibitem{b1}
