@@ -49,7 +49,7 @@ In preparation for this project, data of >100 patients who underwent liver resec
 The project was proposed and discussed with several University Hospitals with a comparable research focus. A formal agreement of collaboration was given by the Universities of Mainz, Regensburg, Hannover and Tübingen.
 The study will be conducted at the UH-RWTH in accordance with the requirements of the current version of the Declaration of Helsinki and the good clinical practice guidelines (ICH-GCP). The project was also approved by the local Institutional Review Board of the RWTH-Aachen University (EK 489/20).
 
-
+\newpage
 \subsection{Project Details}
 The primary aim of this project is to evaluate the ability of deep learning to predict nodal status based on one H\&E-stained tumor slide in iCCA (AIM 1). Secondary, a heat map analysis will reveal tumor regions which are associated with nodal status and therefore allow further basic preclinical analyses giving insight into the tumorigenesis of iCCA (AIM 2).
 
@@ -113,7 +113,7 @@ hgrid,vgrid,
 \end{figure}
 
 \subsection{Description of Methods and Algorithms}
-We will train different deep neural networks to evaluate and compare them on their ability to predict the nodal status based on H\&E-stained tumor slide in iCCA. The results will be evaluated on an unseen portion of the data set (test set). We will use known architectures from Computer Vision like ResNet and - depending on the results - potentially more recent models like Visual Transformers \cite{b23, b24}. The parameters of each network will be optimized using a variant of stochastic gradient descent on mini batches of data. Each mini batch consists of a number of relatively small image patches/tiles of a given resolution of $256\times 256$ (or $224 \times 224$) that are extracted randomly from the tumor slides. This is necessary, as the whole slide images are far too large to process at once (each slide has a size of 0.5Gb - 1Gb). A classifier head will predict the nodal status of each tile independently. The target for loss computation is taken from the known status of the whole slide image. For each model, a hyper parameter search will be conducted. For each hyper parameter set, each model will be trained for approximately 100 epoches (though early stopping mechanism will be utilized). The models are implemented using the pytorch-lightning API, which works on top of the pytorch library \cite{b25, b26}.
+We will train different deep neural networks to evaluate and compare them on their ability to predict the nodal status based on H\&E-stained tumor slide in iCCA. The results will be evaluated on an unseen portion of the data set (test set). We will use known architectures from Computer Vision like  \texttt{RESNET} and - depending on the results - potentially more recent models like Vision Transformers \cite{b23, b24}. The parameters of each network will be optimized using a variant of stochastic gradient descent on mini batches of data. Each mini batch consists of a number of relatively small image patches/tiles of a given resolution of $256\times 256$ (or $224 \times 224$) that are extracted randomly from the tumor slides. This is necessary, as the whole slide images are far too large to process at once (each slide has a size of 0.5Gb - 1Gb). A classifier head will predict the nodal status of each tile independently. The target for loss computation is taken from the known status of the whole slide image. For each model, a hyper parameter search will be conducted. The models are implemented using the pytorch-lightning API, which works on top of the pytorch library \cite{b25, b26}.
 
 \subsection{Code Performance}
 
@@ -124,7 +124,7 @@ we choose 63-37\% split of the data and measure the average GPU time per sample.
 For an optimal performance we limit the batch size to the maximal size one computation node can handle (here: $B=800$) before the memory overflows. We remark that the optimal batch size is dependent on the architecture used for the network (here: \texttt{RESNET18}),
 but the difference between varying architectures should be small.
 With this setting we train over several epochs and divide the wall-time by the number
-of epochs and the number of samples $B$ per epoch. We result in an average of about $t_\mathrm{sample}=2$ seconds for one sample.
+of epochs, graphic cards (2) and the number of samples per epoch. We result in an average of about $t_\mathrm{sample}=10$ms for one sample.
 
 The data set of the RWTH-Aachen Cohort includes $N=450000$ samples. From previous studies
 we assume to converge within $E=500$ epochs to a trained network, which explains the amount of
@@ -133,26 +133,27 @@ is estimated to include both datasets.
 
 \subsection{Estimated resources on the RWTH Compute Cluster}
 
-The amount of resources needed is listed in \cref{tabl:resource}
+The amount of resources needed is listed in \cref{tabl:resource}.
+An average job will run on 6 to 8 GPUs (144 to 192 CPUs) with 12 to 24 hours run-time.
 
 \begin{table}
 	\centering
 	\begin{tabular}{l l l}
 		\toprule
-		Quantity & Amount \\
+		Quantity & Amount &  \\
 		\midrule
 		\textbf{Memory} (\texttt{work}) & 500 Gb \\
 		\hline
 		\textbf{GPU time} \\
-		development & 125k GPU/h  \\
-		RWTH Cohort & 125k GPU/h \\
-		Combined Analysis & 250k GPU/h \\
+		development & 625 GPU-hours & 15k CPU-hours \\
+		RWTH Cohort & 625 GPU-hours & 15k CPU-hours\\
+		Combined Analysis & 1.25k GPU-hours & 30k CPU-hours \\
 		\hline
 		\hline
-		\textbf{total} &  500k GPU/h\\
+		\textbf{total} &  2.5k GPU-hours & 60k CPU-hours\\
 		\bottomrule
 	\end{tabular}
-	\caption{Summary of the estimated resources. The GPU time is estimated and applied for the Tesla \texttt{V100} Graphiccards}
+	\caption{Summary of the estimated resources. The GPU time (GPU-hours) is estimated and applied for the Tesla \texttt{V100} Graphiccards, with 24 available CPUs on a socket. The resulting CPU time ($=24*$GPU-time) assumes that during execution of one GPU 24 CPUs are occupied.}
 	\label{tabl:resource}
 \end{table}
 
