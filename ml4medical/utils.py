@@ -33,7 +33,7 @@ def sort_into_classes_by_csv(data_path, csv_path):
                 shutil.move(data_path + slide, data_path + 'missing/' + slide)
 
 
-def train_val_split_slides(data_path, classes, split_fraction=0.125, rand_seed=0, balanced_val_set=True):
+def train_val_split_slides(data_path, classes, split_fraction=0.125, rand_seed=0, balanced_val_set=True, data_variant='CCC'):
     """
     pick random slides, so that the split_fraction is approximately met for the number of tiles and sort them into train and val folder
     """
@@ -45,13 +45,32 @@ def train_val_split_slides(data_path, classes, split_fraction=0.125, rand_seed=0
     slides_in_cls = dict()
     for cls in classes:
         n_tiles_in_slide[cls] = []
-        slides_in_cls[cls] = os.listdir(data_path + cls + '/')
-        n_slides[cls] = 0
-        for slide in slides_in_cls[cls]:
-            n_tiles_in_slide[cls].append(len(os.listdir(data_path + cls + '/' + slide + '/tiles')))
-            n_slides[cls] += 1
-        n_tiles_in_slide[cls] = np.array(n_tiles_in_slide[cls])
-        n_tiles_in_class[cls] = np.sum(n_tiles_in_slide[cls])
+        if data_variant == 'CCC':
+            slides_in_cls[cls] = os.listdir(data_path + cls + '/')
+            n_slides[cls] = 0
+            for slide in slides_in_cls[cls]:
+                n_tiles_in_slide[cls].append(len(os.listdir(data_path + cls + '/' + slide + '/tiles')))
+                n_slides[cls] += 1
+            n_tiles_in_slide[cls] = np.array(n_tiles_in_slide[cls])
+            n_tiles_in_class[cls] = np.sum(n_tiles_in_slide[cls])
+        elif data_variant == 'MSIMSS':
+            all_tiles_in_slide = os.listdir(data_path + cls + '/')
+            slides ={}
+            for tile in all_tiles_in_slide:
+                slide = '-'.join(tile.split('-')[2:5])
+                if slide not in slides:
+                    slides[slide] = []
+                slides[slide].append(tile)
+            slides_in_cls[cls] = slides
+            n_slides[cls] = 0
+            for slide in slides_in_cls[cls]:
+                n_tiles_in_slide[cls].append(len(slides_in_cls[cls][slide]))
+                n_slides[cls] += 1
+            n_tiles_in_slide[cls] = np.array(n_tiles_in_slide[cls])
+            n_tiles_in_class[cls] = np.sum(n_tiles_in_slide[cls])
+            
+                
+            
     
     n_tiles_in_class_val = {cls: round(split_fraction * n_tiles) for cls, n_tiles in n_tiles_in_class.items()}
     if balanced_val_set:
@@ -75,8 +94,8 @@ def train_val_split_slides(data_path, classes, split_fraction=0.125, rand_seed=0
             slides_to_pick_from = list(set(slides_to_pick_from) - set(random_slides))
             if np.min(n_tiles_in_slide[cls]) <= n_tiles_in_class_val[cls] - n_tiles_so_far < np.max(n_tiles_in_slide[cls]):
                 random_slide = np.abs((n_tiles_in_class_val[cls] - n_tiles_so_far) - n_tiles_in_slide[cls][slides_to_pick_from]).argmin()
-                random_slides.append(random_slide)
-                n_tiles_in_random_slide = n_tiles_in_slide[cls][random_slide]
+                random_slides.append(slides_to_pick_from[random_slide])
+                n_tiles_in_random_slide = n_tiles_in_slide[cls][slides_to_pick_from[random_slide]]
                 n_tiles_so_far += n_tiles_in_random_slide
                 keep_searching = False
             it += 1
@@ -96,7 +115,12 @@ def train_val_split_slides(data_path, classes, split_fraction=0.125, rand_seed=0
             for slide_idx in val_slides[cls]:
                 if not os.path.isdir(data_path + 'val/' + cls + '/'):
                     os.mkdir(data_path + 'val/' + cls + '/')
-                shutil.move(data_path + cls + '/' + slides_in_cls[cls][slide_idx],
-                            data_path + 'val/' + cls + '/' + slides_in_cls[cls][slide_idx])
+                if data_variant == 'CCC':
+                    shutil.move(data_path + cls + '/' + slides_in_cls[cls][slide_idx],
+                                data_path + 'val/' + cls + '/' + slides_in_cls[cls][slide_idx])
+                elif data_variant == 'MSIMSS':
+                    slide = list(slides_in_cls[cls].keys())[slide_idx]
+                    for tile in slides_in_cls[cls][slide]:
+                        shutil.move(data_path + cls + '/' + tile, data_path + 'val/' + cls + '/' + tile)
             shutil.move(data_path + cls, data_path + 'train/' + cls)
 

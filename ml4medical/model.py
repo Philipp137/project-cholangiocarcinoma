@@ -88,12 +88,19 @@ class Classifier(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         x, y = batch
         
-        if len(y.shape) > 1: # batch has subbatch dimension
-            y = y.float().mean(1)
-            if self.num_classes > 1:
-                y = y.long()# all labels in subbatch habe to be the same! mean of different labels does not work, since cross_entropy
-                            # expects dtype long
-        
+        # if len(y.shape) > 1: # batch has subbatch dimension
+        #     y = y.float().mean(1)
+        #     if self.num_classes > 1:
+        #         y = y.long()# all labels in subbatch habe to be the same! mean of different labels does not work, since cross_entropy
+        #                     # expects dtype long
+        if y.ndim > 1: # batch has subbatch dimension
+            # all labels in subbatch have to be the same for num_classes >  1! mean of different labels does not work, since cross_entropy
+            # expects dtype long
+            y = y.float().mean(1) if self.num_classes == 1 else y[:, 0]
+        else:
+            if self.num_classes == 1:
+                y = y.float()
+                
         logits_soft = self.accumulated_logits(x, ignore_irrelevant='soft')
         logits_soft = logits_soft.squeeze(-1) if self.num_classes == 1 else logits_soft
         loss_soft = self.classification_loss(logits_soft, y)
