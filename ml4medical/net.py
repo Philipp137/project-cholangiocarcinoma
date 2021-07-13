@@ -8,7 +8,11 @@ class ResNet(nn.Sequential):
         Build one of the resnet variants in torchvision.models.resnet
         """
         super(ResNet, self).__init__()
-        self.add_module('nn', getattr(models, variant)(num_classes=num_classes, pretrained=pretrained))
+        if pretrained and (num_classes != 1000):
+            self.add_module('nn', getattr(models, variant)(num_classes=1000, pretrained=pretrained))
+            self.nn.fc = nn.Linear(self.nn.fc.in_features, num_classes)
+        else:
+            self.add_module('nn', getattr(models, variant)(num_classes=num_classes, pretrained=pretrained))
         if activate_logits:
             self.add_module('relu', nn.ReLU())
 

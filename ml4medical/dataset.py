@@ -103,7 +103,7 @@ class TileImageDataset(datasets.ImageFolder):
                 sample = self.transform(sample)
             if self.target_transform is not None:
                 target = self.target_transform(target)
-                target = 1 - target if self.inverse_targets else target
+            target = 1 - target if self.inverse_targets else target
             samples.append(sample)
             targets.append(target)
         if no_subbatch:

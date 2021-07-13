@@ -68,7 +68,7 @@ class Classifier(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-        
+
         if y.ndim > 1: # batch has subbatch dimension
             # all labels in subbatch have to be the same for num_classes >  1! mean of different labels does not work, since cross_entropy
             # expects dtype long
@@ -163,7 +163,8 @@ class Classifier(pl.LightningModule):
         return self.validation_epoch_end(outputs)
     
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
+        #optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
+        optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, weight_decay=1e-4)
         
         # scheduler = ReduceLROnPlateau(optimizer, patience=3)
         # name_extension = '_soft' if self.relevance_class else ''

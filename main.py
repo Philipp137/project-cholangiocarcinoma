@@ -41,7 +41,8 @@ if __name__ =="__main__":
     
     model_conf = config['model']
     model = Classifier(
-            ResNet(variant=model_conf['resnet_variant'], num_classes=model_conf['num_classes'] + model_conf['relevance_class']),
+            ResNet(variant=model_conf['resnet_variant'], num_classes=model_conf['num_classes'] + model_conf['relevance_class'],
+                   pretrained=model_conf['pretrained']),
             num_classes=model_conf['num_classes'],
             relevance_class=model_conf['relevance_class'],
             lr=model_conf['learning_rate']
