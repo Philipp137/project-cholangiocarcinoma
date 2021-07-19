@@ -32,9 +32,14 @@ class TileImageDataset(datasets.ImageFolder):
         #TODO: Move Transforms out?
         if mode == 'train':
             transforms_list = [
-                transforms.RandomResizedCrop(224, scale=[0.8, 1], ratio=[5. / 6., 6. / 5.]),
+                transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
                 transforms.RandomHorizontalFlip(),
-                transforms.RandomVerticalFlip(),
+                # transforms.RandomVerticalFlip(),
+                transforms.RandomAffine(degrees=180, shear=5, fill=250),
+                transforms.RandomResizedCrop(224, scale=[0.6, 1], ratio=(3. / 4., 4. / 3.)),
+                transforms.RandomAdjustSharpness(sharpness_factor=3, p=0.5),
+                transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.01, 2)),
+                #transforms.RandomAutocontrast(p=0.1),
                 transforms.ToTensor(),
             ]
         else:
@@ -44,7 +49,7 @@ class TileImageDataset(datasets.ImageFolder):
             transforms_list.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
         image_transforms = transforms.Compose(transforms_list)
         super(TileImageDataset, self).__init__(root=os.path.join(root_folder, mode), transform=image_transforms, is_valid_file=is_valid_file)
-        
+        self.apply_transforms = True
         if get_parent_slide is None:
             if data_variant == 'CCC':
                 self.get_parent_slide = parent_slide_name_CCC
@@ -99,9 +104,11 @@ class TileImageDataset(datasets.ImageFolder):
         for idx in index:
             path, target = self.samples[idx]
             sample = self.loader(path)
-            if self.transform is not None:
+            if self.transform is not None and self.apply_transforms:
                 sample = self.transform(sample)
-            if self.target_transform is not None:
+            else:
+                sample = transforms.ToTensor()(sample)
+            if self.target_transform is not None and self.apply_transforms:
                 target = self.target_transform(target)
             target = 1 - target if self.inverse_targets else target
             samples.append(sample)

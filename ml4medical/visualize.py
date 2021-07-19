@@ -35,3 +35,19 @@ def show_datasamples(data_module, samples_per_class, samples_per_row):
     all_samples = make_grid(torch.stack([train_c0_samples, train_c1_samples, val_c0_samples, val_c1_samples]), 2)
     plt.figure(8)
     plt.imshow(all_samples.permute([1, 2, 0]))
+
+
+def show_transforms(data_module, samples_per_class, samples_per_row):
+    train_class_0_idxs = np.random.choice(data_module.train_dataset.idx_in_class[0], samples_per_class)
+    train_class_1_idxs = np.random.choice(data_module.train_dataset.idx_in_class[1], samples_per_class)
+
+    train_c0_samples = make_grid(data_module.train_dataset[train_class_0_idxs][0], samples_per_row)
+    train_c1_samples = make_grid(data_module.train_dataset[train_class_1_idxs][0], samples_per_row)
+    data_module.train_dataset.apply_transforms = False
+    train_c0_samples_orig = make_grid(data_module.train_dataset[train_class_0_idxs][0], samples_per_row)
+    train_c1_samples_orig = make_grid(data_module.train_dataset[train_class_1_idxs][0], samples_per_row)
+    data_module.train_dataset.apply_transforms = True
+    
+    all_samples = make_grid(torch.stack([train_c0_samples, train_c1_samples, train_c0_samples_orig, train_c1_samples_orig]), 2)
+    plt.figure(8)
+    plt.imshow(all_samples.permute([1, 2, 0]))
