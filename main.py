@@ -1,5 +1,5 @@
 from ml4medical.net import ResNet
-from ml4medical.model import Classifier
+from ml4medical.model import Classifier_simple as Classifier
 from ml4medical.dataset import DataModule
 import pytorch_lightning as pl
 import json
@@ -9,20 +9,27 @@ import os
 
 
 if __name__ =="__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-w', '--num_workers', type=int, help='Number of workers for the DataLoader to use', default=None)
-    parser.add_argument('-n', '--num_nodes', type=int, help='Number of nodes to use on te cluster', default=None)
-    parser.add_argument('-c', '--config', type=str, help='Name of config file to use (including path if in a different folder)', default=None)
-    args = parser.parse_args()
-    config_name = args.config or os.path.dirname(os.path.abspath(__file__)) + '/config.json'
+    config_file_name = 'config_MSI1.json'
+    from_console = False
+    args = None
     
+    if from_console:
+        parser = argparse.ArgumentParser()
+        parser.add_argument('-w', '--num_workers', type=int, help='Number of workers for the DataLoader to use', default=None)
+        parser.add_argument('-n', '--num_nodes', type=int, help='Number of nodes to use on te cluster', default=None)
+        parser.add_argument('-c', '--config', type=str, help='Name of config file to use (including path if in a different folder)', default=None)
+        args = parser.parse_args()
+        config_name = args.config or os.path.dirname(os.path.abspath(__file__)) + '/config.json'
+    else:
+        config_name = os.path.dirname(os.path.abspath(__file__)) + '/' + config_file_name
+        
     with open(config_name) as file:
         config = json.load(file)
         
-    
     trainer_conf = config['trainer']
-    num_workers = args.num_workers or trainer_conf['num_workers']
-    num_nodes = args.num_nodes or trainer_conf['num_nodes']
+    num_workers = args.num_workers or trainer_conf['num_workers'] if args is not None else trainer_conf['num_workers']
+    num_nodes = args.num_nodes or trainer_conf['num_nodes'] if args is not None else trainer_conf['num_nodes']
+    
     data_folder = config['data_root_paths'][trainer_conf['cluster']] + config['data_folder'][trainer_conf['data_variant']]
     
     distributed = torch.cuda.device_count() > 1 or num_nodes > 1
@@ -55,6 +62,7 @@ if __name__ =="__main__":
                          precision=trainer_conf['precision'],
                          benchmark=True,
                          replace_sampler_ddp=False,
-                         accelerator=accelerator,)
+                         accelerator=accelerator,
+                         )
                          
     trainer.fit(model, data_module)

@@ -3,6 +3,81 @@ from torch.nn import functional as F
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import pytorch_lightning as pl
 
+class Classifier_simple(pl.LightningModule):
+    def __init__(self, classifier_net, num_classes=2, relevance_class=False, lr=1e-3):
+        super(Classifier_simple, self).__init__()
+        self.save_hyperparameters()
+        self.classifier_net = classifier_net
+        self.lr = lr
+        self.classification_loss = torch.nn.BCEWithLogitsLoss()
+        self.prob_activation = torch.nn.Sigmoid()
+        self.accuracy = pl.metrics.Accuracy(dist_sync_on_step=True)
+        self.auc = pl.metrics.AUROC(num_classes=2, average='weighted', compute_on_step=False, dist_sync_on_step=True)
+        self.confusion = pl.metrics.ConfusionMatrix(num_classes=2, normalize='true', compute_on_step=False,
+                                                    dist_sync_on_step=True)
+
+    def forward(self, x):
+        # use forward for inference/predictions
+        return self.prob_activation(self.logits(x))
+
+    def logits(self, x):
+        return self.classifier_net(x)
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+    
+        logits = self.logits(x).squeeze(-1)
+        loss = self.classification_loss(logits, y.float())
+    
+        self.log('train_loss', loss, on_epoch=True, sync_dist=True, )
+        self.log('train_acc', self.accuracy(self.prob_activation(logits), y), on_epoch=True, prog_bar=False, sync_dist=True)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        logits = self.logits(x).squeeze(-1)
+        loss = self.classification_loss(logits, y.float())
+    
+        if not self.trainer.running_sanity_check:
+            prob = self.prob_activation(logits)
+            self.log('valid_loss', loss, prog_bar=True, sync_dist=True)
+            acc = self.accuracy(prob, y)
+            self.log('valid_acc', acc, prog_bar=True, sync_dist=True)
+            self.auc(prob, y)
+        
+            self.confusion(prob, y)
+
+    def validation_epoch_end(self, outputs):
+        if not self.trainer.running_sanity_check:
+            confmat = self.confusion.compute()
+            auc = self.auc.compute()
+            self.log('valid_auc', auc, prog_bar=True, sync_dist=True)
+            self.logger.experiment.add_text('confusion',
+                                            f'0-0: {confmat[0, 0].item():.3f};    0-1: {confmat[0, 1].item():.3f};    '
+                                            f'1-1: {confmat[1, 1].item():.3f};    1-0: {confmat[1, 0].item():.3f}', self.current_epoch)
+            self.confusion.reset()
+            self.auc.reset()
+            self.accuracy.reset()
+
+            # TODO show heatmap for some slides
+
+    # for now, just do the same in test as in validation
+    def test_step(self, batch, batch_idx):
+        return self.validation_step(batch, batch_idx)
+
+    def test_epoch_end(self, outputs):
+        return self.validation_epoch_end(outputs)
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
+        #optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, weight_decay=1e-4)
+    
+        # scheduler = ReduceLROnPlateau(optimizer, patience=3)
+        # name_extension = '_soft' if self.relevance_class else ''
+        # return dict(optimizer=optimizer, lr_scheduler=scheduler, monitor='valid_loss'+name_extension)
+    
+        return optimizer
+        
 class Classifier(pl.LightningModule):
     def __init__(self, classifier_net, num_classes=2, relevance_class=False, lr=1e-3):
         super(Classifier, self).__init__()

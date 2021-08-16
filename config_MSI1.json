@@ -23,7 +23,8 @@
   },
   "data_root_paths":
   {
-    "aachen": "/work/nb671233/data/"
+    "aachen": "/work/nb671233/data/",
+    "steffen": "D:/Arbeit/cholangiocarcinoma-data/"
   },
   "data_folder":
   {
