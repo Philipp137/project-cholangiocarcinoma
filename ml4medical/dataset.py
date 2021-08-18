@@ -32,12 +32,12 @@ class TileImageDataset(datasets.ImageFolder):
         #TODO: Move Transforms out?
         if mode == 'train':
             transforms_list = [
-                transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
                 transforms.RandomHorizontalFlip(),
                 # transforms.RandomVerticalFlip(),
-                transforms.RandomAffine(degrees=180, shear=5, fill=250),
+                transforms.RandomAffine(degrees=180, shear=5, fillcolor=250),
                 transforms.RandomResizedCrop(224, scale=[0.6, 1], ratio=(3. / 4., 4. / 3.)),
-                transforms.RandomAdjustSharpness(sharpness_factor=3, p=0.5),
+                transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
+                #transforms.RandomAdjustSharpness(sharpness_factor=3, p=0.5),
                 transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.01, 2)),
                 #transforms.RandomAutocontrast(p=0.1),
                 transforms.ToTensor(),

@@ -124,3 +124,18 @@ def train_val_split_slides(data_path, classes, split_fraction=0.125, rand_seed=0
                         shutil.move(data_path + cls + '/' + tile, data_path + 'val/' + cls + '/' + tile)
             shutil.move(data_path + cls, data_path + 'train/' + cls)
 
+
+def copy_code_base(root_path, dest_path, config_file_name):
+    shutil.copytree(root_path + '\\ml4medical', dest_path + '\\code\\ml4medical')
+    shutil.copy2(root_path + '\\main.py', dest_path + '\\code\\main.py')
+    shutil.copy2(root_path + '\\' + config_file_name, dest_path + '\\code\\' + config_file_name)
+    
+def get_checkpoint_path(checkpoint):
+    if checkpoint:
+        if not checkpoint.endswith('.ckpt'):
+            if not checkpoint.endswith('/') and not checkpoint.endswith('\\'):
+                checkpoint += '/'
+            checkpoint = checkpoint + 'checkpoints/'
+            ckpt_files = [f for f in os.listdir(checkpoint) if f.endswith('.ckpt')][0]
+            checkpoint += ckpt_files
+    return checkpoint
