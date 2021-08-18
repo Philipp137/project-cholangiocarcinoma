@@ -65,19 +65,20 @@ if __name__ =="__main__":
     
     accelerator = 'ddp' if distributed else None
     
-    checkpoint = get_checkpoint_path(resume)
-            
-    trainer = pl.Trainer(gpus=-1,
-                         num_nodes=num_nodes,
-                         max_epochs=trainer_conf['epoches'],
-                         precision=trainer_conf['precision'],
-                         benchmark=True,
-                         replace_sampler_ddp=False,
-                         accelerator=accelerator,
-                         default_root_dir=this_dir + '\\' + trainer_conf['data_variant'],
-                         resume_from_checkpoint=checkpoint,
-                         fast_dev_run=False,
-                         )
-    
+    checkpoint = get_checkpoint_path(resume) or None
+    if checkpoint is None:
+        trainer = pl.Trainer(gpus=-1,
+                             num_nodes=num_nodes,
+                             max_epochs=trainer_conf['epoches'],
+                             precision=trainer_conf['precision'],
+                             benchmark=True,
+                             replace_sampler_ddp=False,
+                             accelerator=accelerator,
+                             default_root_dir=this_dir + '\\' + trainer_conf['data_variant'],
+                             fast_dev_run=False,
+                             )
+    else:
+        trainer = pl.Trainer(resume_from_checkpoint=checkpoint)
+        
     copy_code_base(this_dir, trainer.logger.log_dir, config_file_name)
-    #trainer.fit(model, data_module)
+    trainer.fit(model, data_module)
