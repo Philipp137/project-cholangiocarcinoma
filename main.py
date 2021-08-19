@@ -31,7 +31,7 @@ if __name__ =="__main__":
 
     with open(config_name) as file:
         config = json.load(file)
-        
+    print("config file: ", config_name) 
     trainer_conf = config['trainer']
     num_workers = args.num_workers or trainer_conf['num_workers'] if args is not None else trainer_conf['num_workers']
     num_nodes = args.num_nodes or trainer_conf['num_nodes'] if args is not None else trainer_conf['num_nodes']
@@ -88,5 +88,4 @@ if __name__ =="__main__":
                          )
     copy_code_base(this_dir, trainer.logger.log_dir, config_file_name)
 
-        
     trainer.fit(model, data_module)

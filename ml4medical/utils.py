@@ -29,8 +29,8 @@ def sort_into_classes_by_csv(data_path, csv_path):
             cls = row['label']
             if slide in slide_folders:
                 shutil.move(data_path + slide, data_path + cls + '/' + slide)
-            else:
-                shutil.move(data_path + slide, data_path + 'missing/' + slide)
+            #else:
+            #    shutil.move(data_path + slide, data_path + 'missing/' + slide)
 
 
 def train_val_split_slides(data_path, classes, split_fraction=0.125, rand_seed=0, balanced_val_set=True, data_variant='CCC'):
