@@ -140,3 +140,15 @@ def get_checkpoint_path(checkpoint):
             ckpt_files = [f for f in os.listdir(checkpoint) if f.endswith('.ckpt')][0]
             checkpoint += ckpt_files
     return checkpoint
+
+
+def get_layers_list(module):
+    layers_list = []
+    for layer in module.children():
+        layer_children = [c for c in layer.children()]
+        if layer_children:
+            layers_list.extend(get_layers_list(layer))
+        else:
+            layers_list.append(layer)
+    return layers_list
+    

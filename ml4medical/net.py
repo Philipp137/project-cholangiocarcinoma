@@ -1,5 +1,6 @@
 from torchvision import models
 import torch.nn as nn
+from ml4medical.utils import get_layers_list
 
 
 class ResNet(nn.Sequential):
@@ -15,6 +16,16 @@ class ResNet(nn.Sequential):
             self.add_module('nn', getattr(models, variant)(num_classes=num_classes, pretrained=pretrained))
         if activate_logits:
             self.add_module('relu', nn.ReLU())
-
-
+        
+        self.flat_layers_list = get_layers_list(self.nn)
+        self.frozen_layers_list = []
+        self.learning_layers_list = self.flat_layers_list.copy()
+        
+    def freeze_until_nth_layer(self, index):
+        for layer in self.flat_layers_list[:index]:
+            layer.requires_grad_(False)
+            self.frozen_layers_list.append(layer)
+        self.learning_layers_list = self.flat_layers_list[index:].copy()
+            
+            
 # maybe more to come

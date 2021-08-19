@@ -21,6 +21,9 @@ if __name__ =="__main__":
         parser.add_argument('-c', '--config', type=str, help='Name of config file to use (including path if in a different folder)', default=None)
         parser.add_argument('-r', '--resume', type=str, help='Path to version folder to resume training from or to checkpoint file ('
                                                              'including path if in a different folder)', default=None)
+
+        parser.add_argument('-r', '--resume_config', type=bool, help='Whether or not to use the config from the resume folder',
+                            default=False)
         args = parser.parse_args()
         config_name = args.config or this_dir + '/config.json'
     else:
@@ -55,9 +58,14 @@ if __name__ =="__main__":
     )
     
     model_conf = config['model']
+    classifier_net = ResNet(variant=model_conf['resnet_variant'], num_classes=model_conf['num_classes'] + model_conf['relevance_class'],
+                   pretrained=model_conf['pretrained'])
+                   
+    if 'freeze_until' in config['model'] and config['model']['freeze_until']:
+        classifier_net.freeze_until_nth_layer(config['model']['freeze_until'])
+        
     model = Classifier(
-            ResNet(variant=model_conf['resnet_variant'], num_classes=model_conf['num_classes'] + model_conf['relevance_class'],
-                   pretrained=model_conf['pretrained']),
+            classifier_net,
             num_classes=model_conf['num_classes'],
             relevance_class=model_conf['relevance_class'],
             lr=model_conf['learning_rate']
@@ -66,19 +74,19 @@ if __name__ =="__main__":
     accelerator = 'ddp' if distributed else None
     
     checkpoint = get_checkpoint_path(resume) or None
-    if checkpoint is None:
-        trainer = pl.Trainer(gpus=-1,
-                             num_nodes=num_nodes,
-                             max_epochs=trainer_conf['epoches'],
-                             precision=trainer_conf['precision'],
-                             benchmark=True,
-                             replace_sampler_ddp=False,
-                             accelerator=accelerator,
-                             default_root_dir=this_dir + '\\' + trainer_conf['data_variant'],
-                             fast_dev_run=False,
-                             )
-    else:
-        trainer = pl.Trainer(resume_from_checkpoint=checkpoint)
-        
+
+    trainer = pl.Trainer(gpus=-1,
+                         num_nodes=num_nodes,
+                         max_epochs=trainer_conf['epoches'],
+                         precision=trainer_conf['precision'],
+                         benchmark=True,
+                         replace_sampler_ddp=False,
+                         accelerator=accelerator,
+                         default_root_dir=this_dir + '\\' + trainer_conf['data_variant'],
+                         fast_dev_run=False,
+                         resume_from_checkpoint=checkpoint
+                         )
     copy_code_base(this_dir, trainer.logger.log_dir, config_file_name)
+
+        
     trainer.fit(model, data_module)
