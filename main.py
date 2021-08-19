@@ -14,6 +14,7 @@ if __name__ =="__main__":
     from_console = False
     args = None
     this_dir = os.path.dirname(os.path.abspath(__file__))
+    #this_dir = "/home/nb671233/project-cholangiocarcinoma"
     if from_console:
         parser = argparse.ArgumentParser()
         parser.add_argument('-w', '--num_workers', type=int, help='Number of workers for the DataLoader to use', default=None)
@@ -82,7 +83,7 @@ if __name__ =="__main__":
                          benchmark=True,
                          replace_sampler_ddp=False,
                          accelerator=accelerator,
-                         default_root_dir=this_dir + '\\' + trainer_conf['data_variant'],
+                         default_root_dir=this_dir + '/' + trainer_conf['data_variant'],
                          fast_dev_run=False,
                          resume_from_checkpoint=checkpoint
                          )

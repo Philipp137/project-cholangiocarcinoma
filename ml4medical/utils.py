@@ -126,9 +126,9 @@ def train_val_split_slides(data_path, classes, split_fraction=0.125, rand_seed=0
 
 
 def copy_code_base(root_path, dest_path, config_file_name):
-    shutil.copytree(root_path + '\\ml4medical', dest_path + '\\code\\ml4medical')
-    shutil.copy2(root_path + '\\main.py', dest_path + '\\code\\main.py')
-    shutil.copy2(root_path + '\\' + config_file_name, dest_path + '\\code\\' + config_file_name)
+    shutil.copytree(root_path + '/ml4medical', dest_path + '/code/ml4medical')
+    shutil.copy2(root_path + '/main.py', dest_path + '/code/main.py')
+    shutil.copy2(root_path + '/' + config_file_name, dest_path + '/code/' + config_file_name)
     
     
 def get_checkpoint_path(checkpoint):

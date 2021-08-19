@@ -12,7 +12,7 @@
     "precision": 16,
     "num_workers": 12,
     "num_nodes": 1,
-    "resume": "./MSIMSS/lightning_logs/version_6"
+    "resume": ""
   },
   "model":
   {
@@ -21,7 +21,7 @@
     "num_classes": 1,
     "relevance_class": false,
     "learning_rate": 1e-5,
-    "freeze_until": -5
+    "freeze_until": -6
   },
   "data_root_paths":
   {
