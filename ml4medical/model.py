@@ -238,8 +238,8 @@ class Classifier(pl.LightningModule):
         return self.validation_epoch_end(outputs)
     
     def configure_optimizers(self):
-        #optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
-        optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, weight_decay=1e-4)
+        optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
+        #optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, weight_decay=1e-4)
         
         # scheduler = ReduceLROnPlateau(optimizer, patience=3)
         # name_extension = '_soft' if self.relevance_class else ''

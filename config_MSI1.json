@@ -10,7 +10,7 @@
     "val_batch_size": 700,
     "val_subbatch_size": 0,
     "precision": 16,
-    "num_workers": 12,
+    "num_workers": 8,
     "num_nodes": 1,
     "resume": ""
   },
@@ -18,7 +18,7 @@
   {
     "resnet_variant": "resnet18",
     "pretrained": true,
-    "num_classes": 1,
+    "num_classes": 2,
     "relevance_class": false,
     "learning_rate": 1e-5,
     "freeze_until": -6
@@ -26,7 +26,8 @@
   "data_root_paths":
   {
     "aachen": "/work/nb671233/data/",
-    "steffen": "D:/Arbeit/cholangiocarcinoma-data/"
+    "steffen": "D:/Arbeit/cholangiocarcinoma-data/",
+    "steffen_CCC": "D:/Arbeit/med_data/CCC/"
   },
   "data_folder":
   {

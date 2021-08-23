@@ -1,5 +1,5 @@
 from ml4medical.net import ResNet
-from ml4medical.model import Classifier_simple as Classifier
+from ml4medical.model import Classifier
 from ml4medical.dataset import DataModule
 from ml4medical.utils import copy_code_base, get_checkpoint_path
 import pytorch_lightning as pl
@@ -7,13 +7,14 @@ import json
 import torch
 import argparse
 import os
+from ml4medical.utils import get_project_root
 
 
 if __name__ =="__main__":
     config_file_name = 'config_MSI1.json'
     from_console = False
     args = None
-    this_dir = os.path.dirname(os.path.abspath(__file__))
+    this_dir = get_project_root()
     #this_dir = "/home/nb671233/project-cholangiocarcinoma"
     if from_console:
         parser = argparse.ArgumentParser()
@@ -23,9 +24,12 @@ if __name__ =="__main__":
         parser.add_argument('-r', '--resume', type=str, help='Path to version folder to resume training from or to checkpoint file ('
                                                              'including path if in a different folder)', default=None)
 
-        parser.add_argument('-r', '--resume_config', type=bool, help='Whether or not to use the config from the resume folder',
+        parser.add_argument('-rc', '--resume_config', type=bool, help='Whether or not to use the config from the resume folder',
                             default=False)
         args = parser.parse_args()
+        
+        #if args.resume_config:
+        
         config_name = args.config or this_dir + '/config.json'
     else:
         config_name = this_dir + '/' + config_file_name

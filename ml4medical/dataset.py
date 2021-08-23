@@ -28,25 +28,31 @@ def tile_position_CCC(tile_path):
     
     
 class TileImageDataset(datasets.ImageFolder):
-    def __init__(self, root_folder, mode, normalize=True, data_variant='CCC', get_parent_slide=None, get_tile_position=None):
+    def __init__(self, root_folder, mode, normalize=True, data_variant='CCC', get_parent_slide=None, get_tile_position=None,
+                 resolution=None):
         #TODO: Move Transforms out?
-        if mode == 'train':
-            transforms_list = [
-                transforms.RandomHorizontalFlip(),
-                # transforms.RandomVerticalFlip(),
-                transforms.RandomAffine(degrees=180, shear=5, fillcolor=250),
-                transforms.RandomResizedCrop(224, scale=[0.6, 1], ratio=(3. / 4., 4. / 3.)),
-                #transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.1),
-                #transforms.RandomAdjustSharpness(sharpness_factor=3, p=0.5),
-                transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.01, 2)),
-                #transforms.RandomAutocontrast(p=0.1),
-                transforms.ToTensor(),
-            ]
-        else:
-            transforms_list = [transforms.ToTensor()]
-
+        resulution = resolution or 256 if data_variant == 'CCC' else 224
+        transforms_list = [transforms.ToTensor()]
+        self.resize = None
+        if data_variant == 'CCC':
+            self.resize = transforms.Resize(resulution)
+            transforms_list.append(self.resize)
         if normalize:
             transforms_list.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
+        if mode == 'train':
+            transforms_list.extend([
+                transforms.RandomHorizontalFlip(),
+                # transforms.RandomVerticalFlip(),
+                transforms.RandomAffine(degrees=180, shear=5, fill=0.92),
+                transforms.RandomResizedCrop(resulution, scale=[0.6, 1], ratio=(3. / 4., 4. / 3.)),
+                transforms.ColorJitter(brightness=0.02, contrast=0.02, saturation=0.02, hue=0.02),
+                transforms.RandomAdjustSharpness(sharpness_factor=3, p=0.5),
+                transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.01, 2)),
+                transforms.RandomAutocontrast(p=0.1),
+            ])
+
+        #transforms_list.append()
+            
         image_transforms = transforms.Compose(transforms_list)
         super(TileImageDataset, self).__init__(root=os.path.join(root_folder, mode), transform=image_transforms, is_valid_file=is_valid_file)
         self.apply_transforms = True
@@ -108,6 +114,8 @@ class TileImageDataset(datasets.ImageFolder):
                 sample = self.transform(sample)
             else:
                 sample = transforms.ToTensor()(sample)
+                if self.resize:
+                    sample = self.resize(sample)
             if self.target_transform is not None and self.apply_transforms:
                 target = self.target_transform(target)
             target = 1 - target if self.inverse_targets else target
@@ -266,12 +274,13 @@ class DataModule(pl.LightningDataModule):
                      val_subbatch_mode='slide',
                      train_balance=None,
                      val_balance=None,
+                     normalize = None,
                      distributed=False,
                      num_workers=1,
                      persistent_workers=False,
                      ):
             super(DataModule, self).__init__()
-            normalize = data_variant != 'MSIMSS'
+            normalize = normalize if normalize is not None else data_variant != 'MSIMSS'
             self.train_dataset = TileImageDataset(root_folder=root_folder, mode='train', data_variant=data_variant, normalize=normalize)
             self.val_dataset = TileImageDataset(root_folder=root_folder, mode='val', data_variant=data_variant, normalize=normalize)
             self.train_batch_size = train_batch_size
