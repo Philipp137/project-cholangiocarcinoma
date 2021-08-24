@@ -89,14 +89,14 @@ class normalize_slide(object):
         Inorm[Inorm > 255] = 254
         Inorm = np.reshape(Inorm.T, (h, w, 3)).astype(np.uint8)
 
-        # unmix hematoxylin and eosin
-        H = np.multiply(Io, np.exp(np.expand_dims(-HERef[:, 0], axis=1).dot(np.expand_dims(C2[0, :], axis=0))))
-        H[H > 255] = 254
-        H = np.reshape(H.T, (h, w, 3)).astype(np.uint8)
-
-        E = np.multiply(Io, np.exp(np.expand_dims(-HERef[:, 1], axis=1).dot(np.expand_dims(C2[1, :], axis=0))))
-        E[E > 255] = 254
-        E = np.reshape(E.T, (h, w, 3)).astype(np.uint8)
+        # # unmix hematoxylin and eosin
+        # H = np.multiply(Io, np.exp(np.expand_dims(-HERef[:, 0], axis=1).dot(np.expand_dims(C2[0, :], axis=0))))
+        # H[H > 255] = 254
+        # H = np.reshape(H.T, (h, w, 3)).astype(np.uint8)
+        #
+        # E = np.multiply(Io, np.exp(np.expand_dims(-HERef[:, 1], axis=1).dot(np.expand_dims(C2[1, :], axis=0))))
+        # E[E > 255] = 254
+        # E = np.reshape(E.T, (h, w, 3)).astype(np.uint8)
 
         return Image.fromarray(Inorm)
 
