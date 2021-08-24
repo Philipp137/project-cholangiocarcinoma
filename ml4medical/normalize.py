@@ -1,9 +1,8 @@
 import argparse
 import numpy as np
 from PIL import Image
-import torch as to
 
-class normalize_slide(object):
+class NormalizeStaining(object):
     ''' Normalize staining appearence of H&E stained images
 
     Output:
@@ -36,7 +35,7 @@ class normalize_slide(object):
         maxCRef = self.maxCRef
         # reshape image
 
-        img = np.array(np.array(PILIMAGE))
+        img = np.array(PILIMAGE)
         # define height and width of image
         h, w, c = img.shape
 
@@ -236,7 +235,7 @@ if __name__ == '__main__':
         plt.subplot(1,2,1)
         plt.imshow(batch[0].T)
 
-        custom_trafo = transforms.Compose([normalize_slide(), transforms.ToTensor()])
+        custom_trafo = transforms.Compose([NormalizeStaining(), transforms.ToTensor()])
         dataset = datasets.ImageFolder(root=rootdir, transform=custom_trafo)
         train_dataloader = DataLoader(dataset, batch_size=64, shuffle=False)
         batch, labels = next(iter(train_dataloader))

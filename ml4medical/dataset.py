@@ -6,6 +6,9 @@ from torch.utils.data import DataLoader
 from pathlib import Path
 import pytorch_lightning as pl
 
+import ml4medical
+
+
 def is_valid_file(fpath):
     return fpath.lower().endswith('.png')
     
@@ -32,13 +35,14 @@ class TileImageDataset(datasets.ImageFolder):
                  resolution=None):
         #TODO: Move Transforms out?
         resulution = resolution or 256 if data_variant == 'CCC' else 224
-        transforms_list = [transforms.ToTensor()]
+        transforms_list = []
+        if normalize:
+            transforms_list.append(ml4medical.NormalizeStaining())
+        transforms_list.append(transforms.ToTensor())
         self.resize = None
         if data_variant == 'CCC':
             self.resize = transforms.Resize(resulution)
             transforms_list.append(self.resize)
-        if normalize:
-            transforms_list.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
         if mode == 'train':
             transforms_list.extend([
                 transforms.RandomHorizontalFlip(),

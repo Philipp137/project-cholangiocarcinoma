@@ -26,6 +26,7 @@ if __name__ =="__main__":
 
         parser.add_argument('-rc', '--resume_config', type=bool, help='Whether or not to use the config from the resume folder',
                             default=False)
+        parser.add_argument('-d', '--data', type=str, help='name of data type ( either  "CCC" or "MSIMSS" )' , default=None)
         args = parser.parse_args()
         
         #if args.resume_config:
@@ -40,7 +41,7 @@ if __name__ =="__main__":
     trainer_conf = config['trainer']
     num_workers = args.num_workers or trainer_conf['num_workers'] if args is not None else trainer_conf['num_workers']
     num_nodes = args.num_nodes or trainer_conf['num_nodes'] if args is not None else trainer_conf['num_nodes']
-    
+    data_variant = args.data or trainer_conf['data_variant']
     if 'resume' in trainer_conf:
         resume = args.resume or trainer_conf['resume'] if args is not None else trainer_conf['resume']
     else:
@@ -48,11 +49,14 @@ if __name__ =="__main__":
     
     data_folder = config['data_root_paths'][trainer_conf['cluster']] + config['data_folder'][trainer_conf['data_variant']]
     
-    distributed = torch.cuda.device_count() > 1 or num_nodes > 1
+    n_gpu = torch.cuda.device_count()
+    print(f'seeing {n_gpu} GPU')
+    distributed = n_gpu > 1 or num_nodes > 1
+    
     pl.seed_everything(trainer_conf['random_seed'])
     data_module = DataModule(
             root_folder=data_folder,
-            data_variant=trainer_conf['data_variant'],
+            data_variant=data_variant,
             train_batch_size=trainer_conf['batch_size'],
             val_batch_size=trainer_conf['val_batch_size'],
             train_subbatch_size=trainer_conf['subbatch_size'],
@@ -64,7 +68,7 @@ if __name__ =="__main__":
     
     model_conf = config['model']
     classifier_net = ResNet(variant=model_conf['resnet_variant'], num_classes=model_conf['num_classes'] + model_conf['relevance_class'],
-                   pretrained=model_conf['pretrained'])
+                            pretrained=model_conf['pretrained'])
                    
     if 'freeze_until' in config['model'] and config['model']['freeze_until']:
         classifier_net.freeze_until_nth_layer(config['model']['freeze_until'])
@@ -73,7 +77,7 @@ if __name__ =="__main__":
             classifier_net,
             num_classes=model_conf['num_classes'],
             relevance_class=model_conf['relevance_class'],
-            lr=model_conf['learning_rate']
+            optimizer=model_conf['optimizer']
     )
     
     accelerator = 'ddp' if distributed else None

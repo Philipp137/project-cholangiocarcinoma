@@ -56,5 +56,5 @@ def show_transforms(data_module, samples_per_class, samples_per_row, variant='CC
     ds.apply_transforms = True
     
     all_samples = make_grid(torch.stack([train_c0_samples, train_c1_samples, train_c0_samples_orig, train_c1_samples_orig]), 2)
-    plt.figure(8)
+    plt.figure()
     plt.imshow(all_samples.permute([1, 2, 0]))

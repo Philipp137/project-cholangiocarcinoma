@@ -1,5 +1,6 @@
 import torch
 from torch.nn import functional as F
+import torchmetrics
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import pytorch_lightning as pl
 
@@ -11,9 +12,9 @@ class Classifier_simple(pl.LightningModule):
         self.lr = lr
         self.classification_loss = torch.nn.BCEWithLogitsLoss()
         self.prob_activation = torch.nn.Sigmoid()
-        self.accuracy = pl.metrics.Accuracy(dist_sync_on_step=True)
-        self.auc = pl.metrics.AUROC(num_classes=2, average='weighted', compute_on_step=False, dist_sync_on_step=True)
-        self.confusion = pl.metrics.ConfusionMatrix(num_classes=2, normalize='true', compute_on_step=False,
+        self.accuracy = torchmetrics.Accuracy(dist_sync_on_step=True)
+        self.auc = torchmetrics.AUROC(num_classes=2, average='weighted', compute_on_step=False, dist_sync_on_step=True)
+        self.confusion = torchmetrics.ConfusionMatrix(num_classes=2, normalize='true', compute_on_step=False,
                                                     dist_sync_on_step=True)
 
     def forward(self, x):
@@ -79,22 +80,23 @@ class Classifier_simple(pl.LightningModule):
         return optimizer
         
 class Classifier(pl.LightningModule):
-    def __init__(self, classifier_net, num_classes=2, relevance_class=False, lr=1e-3):
+    def __init__(self, classifier_net, num_classes=2, relevance_class=False, optimizer={'AdamW': {'lr': 1e-5}}, lr=1e-3):
         super(Classifier, self).__init__()
         self.save_hyperparameters()
         self.classifier_net = classifier_net
         self.num_classes = num_classes
         self.relevance_class = relevance_class
+        self.optimizer_settings = optimizer
         self.lr = lr
         self.prob_activation = torch.nn.Sigmoid() if num_classes == 1 else torch.nn.Softmax(dim=-1)
         self.classification_loss = torch.nn.BCEWithLogitsLoss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
-        self.accuracy = pl.metrics.Accuracy(dist_sync_on_step=True)
-        self.auc = pl.metrics.AUROC(num_classes=max(num_classes, 2), average='weighted', compute_on_step=False, dist_sync_on_step=True)
-        self.confusion = pl.metrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False,
-                                                    dist_sync_on_step=True)
+        self.accuracy = torchmetrics.Accuracy(dist_sync_on_step=True)
+        self.auc = torchmetrics.AUROC(num_classes=max(num_classes, 2), average='weighted', compute_on_step=False, dist_sync_on_step=True)
+        self.confusion = torchmetrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False,
+                                                      dist_sync_on_step=True)
         if self.relevance_class:
-            self.confusion_hard = pl.metrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False,
-                                                             dist_sync_on_step=True)
+            self.confusion_hard = torchmetrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False,
+                                                               dist_sync_on_step=True)
 
     def forward(self, x):
         # use forward for inference/predictions
@@ -180,7 +182,7 @@ class Classifier(pl.LightningModule):
         logits_soft = logits_soft.squeeze(-1) if self.num_classes == 1 else logits_soft
         loss_soft = self.classification_loss(logits_soft, y)
         
-        if not self.trainer.running_sanity_check:
+        if not self.trainer.sanity_checking:
             name_extension = '_soft' if self.relevance_class else ''
             #self.log('valid_loss'+name_extension, loss_soft, on_step=True, prog_bar=False)
             self.log('valid_loss'+name_extension, loss_soft, prog_bar=True, sync_dist=True)
@@ -206,7 +208,7 @@ class Classifier(pl.LightningModule):
                 self.confusion_hard(self.prob_activation(logits_hard), y.long())
         
     def validation_epoch_end(self, outputs):
-        if not self.trainer.running_sanity_check:
+        if not self.trainer.sanity_checking:
             confmat = self.confusion.compute()
             auc = self.auc.compute()
             self.log('valid_auc', auc, prog_bar=True, sync_dist=True)
@@ -238,8 +240,17 @@ class Classifier(pl.LightningModule):
         return self.validation_epoch_end(outputs)
     
     def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
-        #optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, weight_decay=1e-4)
+        optimizer_name = list(self.optimizer_settings.keys())[0]
+        optimizer_settings = self.optimizer_settings[optimizer_name]
+        if not isinstance(optimizer_settings['lr'], list):
+            lr_classifier = optimizer_settings['lr']
+        else:
+            lr_classifier = optimizer_settings['lr'][1]
+            optimizer_settings['lr'] = optimizer_settings['lr'][0]
+        optimizer = getattr(torch.optim, optimizer_name)(
+                [{'params': self.classifier_net.params_base},
+                 {'params': self.classifier_net.params_classifier, 'lr': lr_classifier}
+                 ], **optimizer_settings)
         
         # scheduler = ReduceLROnPlateau(optimizer, patience=3)
         # name_extension = '_soft' if self.relevance_class else ''

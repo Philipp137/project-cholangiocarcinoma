@@ -4,7 +4,7 @@ from ml4medical.utils import get_layers_list
 
 
 class ResNet(nn.Sequential):
-    def __init__(self, variant='resnet18', num_classes=2, activate_logits=False, pretrained=False):
+    def __init__(self, variant='resnet18', dropout=0.0, num_classes=2, activate_logits=False, pretrained=False):
         """
         Build one of the resnet variants in torchvision.models.resnet
         """
@@ -17,6 +17,8 @@ class ResNet(nn.Sequential):
         if activate_logits:
             self.add_module('relu', nn.ReLU())
         
+        self.params_base = [p[1] for p in self.nn.named_parameters() if not p[0].startswith('fc')]
+        self.params_classifier = [p for p in self.nn.fc.parameters()]
         self.flat_layers_list = get_layers_list(self.nn)
         self.frozen_layers_list = []
         self.learning_layers_list = self.flat_layers_list.copy()
