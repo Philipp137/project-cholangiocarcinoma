@@ -18,12 +18,8 @@ class Classifier(pl.LightningModule):
         self.lr = lr
         self.prob_activation = torch.nn.Sigmoid() if num_classes == 1 else torch.nn.Softmax(dim=-1)
         self.classification_loss = torch.nn.BCEWithLogitsLoss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
-        self.accuracy = torchmetrics.Accuracy(dist_sync_on_step=True, average='weighted', num_classes=1, multiclass=False)
-        # self.accuracy_per_cls = torchmetrics.Accuracy(dist_sync_on_step=True, average=None, num_classes=1, multiclass=False)
-        self.auc = torchmetrics.AUROC(num_classes=2, average='weighted', compute_on_step=False,
-                                      dist_sync_on_step=True, pos_label=1)
-        # self.auc_per_cls = torchmetrics.AUROC(num_classes=max(num_classes, 2), average=None, compute_on_step=False,
-        #                                       dist_sync_on_step=True, pos_label=1)
+        self.accuracy = torchmetrics.Accuracy(dist_sync_on_step=True)
+        self.auc = torchmetrics.AUROC(num_classes=2, compute_on_step=False, dist_sync_on_step=True, pos_label=1)
         self.confusion = torchmetrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False,
                                                       dist_sync_on_step=True)
         if self.relevance_class:
@@ -92,12 +88,9 @@ class Classifier(pl.LightningModule):
         logits = self.accumulated_logits(x, ignore_irrelevant='soft')
         logits = logits.squeeze(-1) if self.num_classes == 1 else logits
         loss = self.classification_loss(logits, y)
-        #acc_per_cls = self.accuracy_per_cls(self.prob_activation(logits), y.long())
         self.log('train/loss', loss, on_step=False, on_epoch=True, sync_dist=True, )
-        self.log('train/acc', self.accuracy(self.prob_activation(logits), y.long()),
+        self.log('train/acc', self.accuracy(logits, y.long()),
                  on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-        #self.log('train/acc_0', acc_per_cls[0], on_epoch=True, prog_bar=False, sync_dist=True)
-        #self.log('train/acc_1', acc_per_cls[1], on_epoch=True, prog_bar=False, sync_dist=True)
         return loss
         
     def validation_step(self, batch, batch_idx):
@@ -115,32 +108,24 @@ class Classifier(pl.LightningModule):
             # all labels in subbatch have to be the same for num_classes >  1! mean of different labels does not work, since cross_entropy
             # expects dtype long
             target = target.float().mean(1) if self.num_classes == 1 else target[:, 0]
-        else:
-            if self.num_classes == 1:
-                target = target.float()
+        elif self.num_classes == 1:
+            target = target.float()
                 
         logits_soft = self.accumulated_logits(x, ignore_irrelevant='soft')
         logits_soft = logits_soft.squeeze(-1) if self.num_classes == 1 else logits_soft
         loss_soft = self.classification_loss(logits_soft, target)
         
         if not self.trainer.sanity_checking:
-            
-            probs = self.prob_activation(logits_soft)
-            acc = self.accuracy(probs, target.long())
-            # acc_per_cls = self.accuracy_per_cls(probs, target.long())
-            self.auc(probs, target.long())
-            self.confusion(probs, target.long())
+            acc = self.accuracy(logits_soft, target.long())
+            self.auc(logits_soft, target.long())
+            self.confusion(logits_soft, target.long())
             
             if self.patient_level_vali:
                 results = torch.cat([logits_soft, y], dim=1)
                 self.all_val_results.append(results)
             name_extension = '_soft' if self.relevance_class else ''
             self.log('valid/loss'+name_extension, loss_soft, prog_bar=True, sync_dist=True)
-            #self.log('valid_acc'+name_extension, acc_soft, on_step=True, prog_bar=False)
             self.log('valid/acc'+name_extension, acc, prog_bar=True, sync_dist=True)
-            # self.log('valid/acc_0'+name_extension, acc_per_cls[0], prog_bar=True, sync_dist=True)
-            # self.log('valid/acc_1'+name_extension, acc_per_cls[1], prog_bar=True, sync_dist=True)
-            # self.auc_per_cls(self.prob_activation(logits_soft), y.long())
             
     
             if self.relevance_class:
@@ -157,67 +142,73 @@ class Classifier(pl.LightningModule):
                 self.log('valid_auc_hard', auc_hard, prog_bar=True, sync_dist=True)
                 self.confusion_hard(self.prob_activation(logits_hard), target.long())
                 
-    def get_accumulated_prediction(self, logits, make_prob=False, accum_dim=0, pos_decision_boundary=0.5):
-        probs = self.prob_activation(logits)
-        pos_probs = probs if self.num_classes == 1 else probs[..., 1]
-        predicted_labels = (pos_probs >= pos_decision_boundary).float()
-        accum_pred = predicted_labels.mean(dim=accum_dim)
+    def get_accumulated_prediction(self, logits, method, accum_dim=0, pos_decision_boundary=0.5):
+        if method == 'mean_labels':
+            probs = self.prob_activation(logits)
+            pos_probs = probs if self.num_classes == 1 else probs[..., 1]
+            predicted_labels = (pos_probs >= pos_decision_boundary).float()
+            accum_pos_prob = predicted_labels.mean(dim=accum_dim)
+            accum_pred = torch.stack([1 - accum_pos_prob, accum_pos_prob], dim=-1)
+        elif method == 'mean_probs':
+            probs = self.prob_activation(logits)
+            accum_pred = probs.mean(dim=accum_dim)
+        elif method == 'mean_logits':
+            accum_pred = logits.mean(dim=accum_dim)
         return accum_pred
     
     def validation_epoch_end(self, outputs):
-        if not self.trainer.sanity_checking:
+        if self.trainer.sanity_checking:
+            return
+        all_slides_preds = []
+        all_slides_targets = []
+        if self.patient_level_vali:
+            all_val_results = torch.cat(self.all_val_results, dim=0)
+            all_logits = all_val_results[..., :-2]
+            all_targets = all_val_results[..., -2].long()
+            all_slide_ns = all_val_results[..., -1].long()
+            for n in range(all_slide_ns.max()):
+                slide_idxs = all_slide_ns == n
+                if sum(slide_idxs) >= 10:
+                    all_slides_preds.append(self.get_accumulated_prediction(all_logits[slide_idxs], method='mean_labels'))
+                    all_slides_targets.append(all_targets[slide_idxs][0])
+            all_slides_preds = torch.tensor(all_slides_preds)
+            all_slides_targets = torch.tensor(all_slides_targets)
+            tpr = self.prob_activation(all_logits[all_targets == 1]).round().mean()
+            fpr = self.prob_activation(all_logits[all_targets == 0]).round().mean()
+            pl_tpr = all_slides_preds[all_slides_targets == 1].round().mean()
+            pl_fpr = all_slides_preds[all_slides_targets == 0].round().mean()
             
-            all_slides_preds = []
-            all_slides_targets = []
-            if self.patient_level_vali:
-                all_val_results = torch.cat(self.all_val_results, dim=0)
-                all_logits = all_val_results[..., :-2]
-                all_targets = all_val_results[..., -2].long()
-                all_slide_ns = all_val_results[..., -1].long()
-                for n in range(all_slide_ns.max()):
-                    slide_idxs = all_slide_ns == n
-                    if sum(slide_idxs) >= 10:
-                        all_slides_preds.append(self.get_accumulated_prediction(all_logits[slide_idxs]))
-                        all_slides_targets.append(all_targets[slide_idxs][0])
-                all_slides_preds = torch.tensor(all_slides_preds)
-                all_slides_targets = torch.tensor(all_slides_targets)
-                pl_tpr = all_slides_preds[all_slides_targets == 1].round().mean()
-                pl_fpr = all_slides_preds[all_slides_targets == 0].round().mean()
-                
-                pl_auroc = auroc(all_slides_preds, all_slides_targets, pos_label=1, average='weighted')
-                pl_acc = accuracy(all_slides_preds, all_slides_targets)
-                self.all_val_results = []
-                self.log('valid/pl_auc', pl_auroc, prog_bar=True, sync_dist=True)
-                self.log('valid/pl_acc', pl_acc, prog_bar=True, sync_dist=True)
-                self.log('valid/tpr', pl_tpr, prog_bar=True, sync_dist=True)
-                self.log('valid/fpr', pl_fpr, prog_bar=True, sync_dist=True)
-                
-            confmat = self.confusion.compute()
-            auc = self.auc.compute()
-                
-            self.log('valid/auc', auc, prog_bar=True, sync_dist=True)
-            # auc_per_cls = self.auc_per_cls.compute()
-            # self.log('valid/auc_0', auc_per_cls[0], prog_bar=True, sync_dist=True)
-            # self.log('valid/auc_1', auc_per_cls[1], prog_bar=True, sync_dist=True)
+            pl_auroc = auroc(all_slides_preds, all_slides_targets, pos_label=1)
+            pl_acc = accuracy(all_slides_preds, all_slides_targets)
+            self.all_val_results = []
+            self.log('pl_valid/auc', pl_auroc, prog_bar=True, sync_dist=True)
+            self.log('pl_valid/acc', pl_acc, prog_bar=True, sync_dist=True)
+            self.log('pl_valid/tpr', pl_tpr, prog_bar=True, sync_dist=True)
+            self.log('pl_valid/fpr', pl_fpr, prog_bar=True, sync_dist=True)
+            self.log('valid/tpr', tpr, prog_bar=True, sync_dist=True)
+            self.log('valid/fpr', fpr, prog_bar=True, sync_dist=True)
             
-            name_extension = '_soft' if self.relevance_class else ''
-            self.logger.experiment.add_text('confusion'+name_extension,
+        confmat = self.confusion.compute()
+        auc = self.auc.compute()
+        
+        self.log('valid/auc', auc, prog_bar=True, sync_dist=True)
+        
+        name_extension = '_soft' if self.relevance_class else ''
+        self.logger.experiment.add_text('confusion'+name_extension,
+                                        f'0-0: {confmat[0, 0].item():.3f};    0-1: {confmat[0, 1].item():.3f};    '
+                                        f'1-1: {confmat[1, 1].item():.3f};    1-0: {confmat[1, 0].item():.3f}',
+                                        self.current_epoch)
+        self.confusion.reset()
+        self.auc.reset()
+        self.accuracy.reset()
+        
+        if self.relevance_class:
+            confmat = self.confusion_hard.compute()
+            self.logger.experiment.add_text('confusion_hard',
                                             f'0-0: {confmat[0, 0].item():.3f};    0-1: {confmat[0, 1].item():.3f};    '
                                             f'1-1: {confmat[1, 1].item():.3f};    1-0: {confmat[1, 0].item():.3f}',
                                             self.current_epoch)
-            self.confusion.reset()
-            self.auc.reset()
-            #self.auc_per_cls.reset()
-            self.accuracy.reset()
-            #self.accuracy_per_cls.reset()
-            
-            if self.relevance_class:
-                confmat = self.confusion_hard.compute()
-                self.logger.experiment.add_text('confusion_hard',
-                                                f'0-0: {confmat[0, 0].item():.3f};    0-1: {confmat[0, 1].item():.3f};    '
-                                                f'1-1: {confmat[1, 1].item():.3f};    1-0: {confmat[1, 0].item():.3f}',
-                                                self.current_epoch)
-                self.confusion_hard.reset()
+            self.confusion_hard.reset()
         
             #TODO show heatmap for some slides
             
