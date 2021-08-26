@@ -41,7 +41,7 @@ if __name__ =="__main__":
     trainer_conf = config['trainer']
     num_workers = args.num_workers or trainer_conf['num_workers'] if args is not None else trainer_conf['num_workers']
     num_nodes = args.num_nodes or trainer_conf['num_nodes'] if args is not None else trainer_conf['num_nodes']
-    data_variant = args.data or trainer_conf['data_variant']
+    data_variant = args.data or trainer_conf['data_variant'] if args is not None else trainer_conf['data_variant']
     if 'resume' in trainer_conf:
         resume = args.resume or trainer_conf['resume'] if args is not None else trainer_conf['resume']
     else:
@@ -61,6 +61,7 @@ if __name__ =="__main__":
             val_batch_size=trainer_conf['val_batch_size'],
             train_subbatch_size=trainer_conf['subbatch_size'],
             val_subbatch_size=trainer_conf['val_subbatch_size'],
+            val_return_slide_number=True,
             distributed=distributed,
             num_workers=num_workers,
             persistent_workers=True
@@ -77,7 +78,8 @@ if __name__ =="__main__":
             classifier_net,
             num_classes=model_conf['num_classes'],
             relevance_class=model_conf['relevance_class'],
-            optimizer=model_conf['optimizer']
+            optimizer=model_conf['optimizer'],
+            patient_level_vali=True
     )
     
     accelerator = 'ddp' if distributed else None

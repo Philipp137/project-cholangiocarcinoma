@@ -10,7 +10,7 @@
     "val_batch_size": 700,
     "val_subbatch_size": 0,
     "precision": 16,
-    "num_workers": 8,
+    "num_workers": 12,
     "num_nodes": 1,
     "resume": ""
   },
@@ -21,7 +21,7 @@
     "num_classes": 2,
     "relevance_class": false,
     "freeze_until": -6,
-    "optimizer": {"AdamW": {"lr": 1e-5}}
+    "optimizer": {"Adam": {"lr": [1e-6, 2e-6], "weight_decay": 1e-4}}
   },
   "data_root_paths":
   {

@@ -32,9 +32,10 @@ def tile_position_CCC(tile_path):
     
 class TileImageDataset(datasets.ImageFolder):
     def __init__(self, root_folder, mode, normalize=True, data_variant='CCC', get_parent_slide=None, get_tile_position=None,
-                 resolution=None):
+                 resolution=None, return_slide_number=False):
         #TODO: Move Transforms out?
         resulution = resolution or 256 if data_variant == 'CCC' else 224
+        self.return_slide_number = return_slide_number
         transforms_list = []
         if normalize:
             transforms_list.append(ml4medical.NormalizeStaining())
@@ -46,13 +47,15 @@ class TileImageDataset(datasets.ImageFolder):
         if mode == 'train':
             transforms_list.extend([
                 transforms.RandomHorizontalFlip(),
-                # transforms.RandomVerticalFlip(),
-                transforms.RandomAffine(degrees=180, shear=5, fill=0.92),
-                transforms.RandomResizedCrop(resulution, scale=[0.6, 1], ratio=(3. / 4., 4. / 3.)),
-                transforms.ColorJitter(brightness=0.02, contrast=0.02, saturation=0.02, hue=0.02),
-                transforms.RandomAdjustSharpness(sharpness_factor=3, p=0.5),
-                transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.01, 2)),
-                transforms.RandomAutocontrast(p=0.1),
+                transforms.RandomVerticalFlip(),
+                # transforms.ColorJitter(brightness=0.02, contrast=0.02, saturation=0.02, hue=0.02),
+                # transforms.RandomAffine(degrees=180, shear=5, fill=0),
+                # transforms.RandomResizedCrop(resulution, scale=[0.6, 1], ratio=(3. / 4., 4. / 3.)),
+                # transforms.RandomAdjustSharpness(sharpness_factor=3, p=0.5),
+                # transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.01, 2)),
+                # transforms.RandomAutocontrast(p=0.1),
+    
+                transforms.RandomAffine(degrees=0, translate=[5/256, 5/256], fill=0),
             ])
 
         #transforms_list.append()
@@ -83,6 +86,8 @@ class TileImageDataset(datasets.ImageFolder):
         self.parent_slide_per_class = {n: dict() for n in range(len(self.classes))}
         self.parent_slide_name = list()
         self.parent_slide_class = list()
+        self.slide_n_per_idx = list()
+        self.slide_name_per_idx = list()
         self.tile_position = list()
         self.idx_in_class = {n: [] for n in range(len(self.classes))}
         self._find_tile_info()
@@ -102,6 +107,17 @@ class TileImageDataset(datasets.ImageFolder):
             if self.get_tile_position is not None:
                 self.tile_position.append(self.get_tile_position(pth))
             self.idx_in_class[cls].append(idx)
+        slide_n = 0
+        unsorted_idx = []
+        for slide, idxs in self.parent_slide.items():
+            for idx in idxs:
+                unsorted_idx.append(idx)
+                self.slide_n_per_idx.append(slide_n)
+                self.slide_name_per_idx.append(slide)
+            slide_n += 1
+        self.slide_n_per_idx = [x for _, x in sorted(zip(unsorted_idx, self.slide_n_per_idx))]
+        self.slide_name_per_idx = [x for _, x in sorted(zip(unsorted_idx, self.slide_name_per_idx))]
+        
         #self.tile_position = np.array(self.tile_position) if self.tile_position else self.tile_position
         
     def __getitem__(self, index):
@@ -123,6 +139,9 @@ class TileImageDataset(datasets.ImageFolder):
             if self.target_transform is not None and self.apply_transforms:
                 target = self.target_transform(target)
             target = 1 - target if self.inverse_targets else target
+            if self.return_slide_number:
+                slide_number = self.slide_n_per_idx[idx]
+                target = torch.tensor([target, slide_number])
             samples.append(sample)
             targets.append(target)
         if no_subbatch:
@@ -130,7 +149,7 @@ class TileImageDataset(datasets.ImageFolder):
             targets = targets[0]
         else:
             samples = torch.stack(samples, dim=0)
-            targets = torch.tensor(targets)
+            targets = torch.stack(targets, dim=0) if self.return_slide_number else torch.tensor(targets)
             
         return samples, targets
     
@@ -279,14 +298,18 @@ class DataModule(pl.LightningDataModule):
                      train_balance=None,
                      val_balance=None,
                      normalize = None,
+                     train_return_slide_number = False,
+                     val_return_slide_number = False,
                      distributed=False,
                      num_workers=1,
                      persistent_workers=False,
                      ):
             super(DataModule, self).__init__()
             normalize = normalize if normalize is not None else data_variant != 'MSIMSS'
-            self.train_dataset = TileImageDataset(root_folder=root_folder, mode='train', data_variant=data_variant, normalize=normalize)
-            self.val_dataset = TileImageDataset(root_folder=root_folder, mode='val', data_variant=data_variant, normalize=normalize)
+            self.train_dataset = TileImageDataset(root_folder=root_folder, mode='train', data_variant=data_variant, normalize=normalize,
+                                                  return_slide_number=train_return_slide_number)
+            self.val_dataset = TileImageDataset(root_folder=root_folder, mode='val', data_variant=data_variant, normalize=normalize,
+                                                return_slide_number=val_return_slide_number)
             self.train_batch_size = train_batch_size
             self.val_batch_size = val_batch_size
             self.train_subbatch_size = train_subbatch_size

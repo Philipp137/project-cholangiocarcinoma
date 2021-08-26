@@ -1,86 +1,14 @@
 import torch
 from torch.nn import functional as F
 import torchmetrics
+from torchmetrics.functional.classification import auroc, accuracy
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 import pytorch_lightning as pl
 
-class Classifier_simple(pl.LightningModule):
-    def __init__(self, classifier_net, num_classes=2, relevance_class=False, lr=1e-3):
-        super(Classifier_simple, self).__init__()
-        self.save_hyperparameters()
-        self.classifier_net = classifier_net
-        self.lr = lr
-        self.classification_loss = torch.nn.BCEWithLogitsLoss()
-        self.prob_activation = torch.nn.Sigmoid()
-        self.accuracy = torchmetrics.Accuracy(dist_sync_on_step=True)
-        self.auc = torchmetrics.AUROC(num_classes=2, average='weighted', compute_on_step=False, dist_sync_on_step=True)
-        self.confusion = torchmetrics.ConfusionMatrix(num_classes=2, normalize='true', compute_on_step=False,
-                                                    dist_sync_on_step=True)
-
-    def forward(self, x):
-        # use forward for inference/predictions
-        return self.prob_activation(self.logits(x))
-
-    def logits(self, x):
-        return self.classifier_net(x)
-
-    def training_step(self, batch, batch_idx):
-        x, y = batch
-    
-        logits = self.logits(x).squeeze(-1)
-        loss = self.classification_loss(logits, y.float())
-    
-        self.log('train_loss', loss, on_epoch=True, sync_dist=True, )
-        self.log('train_acc', self.accuracy(self.prob_activation(logits), y), on_epoch=True, prog_bar=False, sync_dist=True)
-        return loss
-
-    def validation_step(self, batch, batch_idx):
-        x, y = batch
-        logits = self.logits(x).squeeze(-1)
-        loss = self.classification_loss(logits, y.float())
-    
-        if not self.trainer.running_sanity_check:
-            prob = self.prob_activation(logits)
-            self.log('valid_loss', loss, prog_bar=True, sync_dist=True)
-            acc = self.accuracy(prob, y)
-            self.log('valid_acc', acc, prog_bar=True, sync_dist=True)
-            self.auc(prob, y)
-        
-            self.confusion(prob, y)
-
-    def validation_epoch_end(self, outputs):
-        if not self.trainer.running_sanity_check:
-            confmat = self.confusion.compute()
-            auc = self.auc.compute()
-            self.log('valid_auc', auc, prog_bar=True, sync_dist=True)
-            self.logger.experiment.add_text('confusion',
-                                            f'0-0: {confmat[0, 0].item():.3f};    0-1: {confmat[0, 1].item():.3f};    '
-                                            f'1-1: {confmat[1, 1].item():.3f};    1-0: {confmat[1, 0].item():.3f}', self.current_epoch)
-            self.confusion.reset()
-            self.auc.reset()
-            self.accuracy.reset()
-
-            # TODO show heatmap for some slides
-
-    # for now, just do the same in test as in validation
-    def test_step(self, batch, batch_idx):
-        return self.validation_step(batch, batch_idx)
-
-    def test_epoch_end(self, outputs):
-        return self.validation_epoch_end(outputs)
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.AdamW(self.parameters(), lr=self.lr)
-        #optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, weight_decay=1e-4)
-    
-        # scheduler = ReduceLROnPlateau(optimizer, patience=3)
-        # name_extension = '_soft' if self.relevance_class else ''
-        # return dict(optimizer=optimizer, lr_scheduler=scheduler, monitor='valid_loss'+name_extension)
-    
-        return optimizer
         
 class Classifier(pl.LightningModule):
-    def __init__(self, classifier_net, num_classes=2, relevance_class=False, optimizer={'AdamW': {'lr': 1e-5}}, lr=1e-3):
+    def __init__(self, classifier_net, num_classes=2, relevance_class=False, optimizer={'AdamW': {'lr': 1e-5}}, lr=1e-3,
+                 patient_level_vali=True):
         super(Classifier, self).__init__()
         self.save_hyperparameters()
         self.classifier_net = classifier_net
@@ -90,13 +18,20 @@ class Classifier(pl.LightningModule):
         self.lr = lr
         self.prob_activation = torch.nn.Sigmoid() if num_classes == 1 else torch.nn.Softmax(dim=-1)
         self.classification_loss = torch.nn.BCEWithLogitsLoss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
-        self.accuracy = torchmetrics.Accuracy(dist_sync_on_step=True)
-        self.auc = torchmetrics.AUROC(num_classes=max(num_classes, 2), average='weighted', compute_on_step=False, dist_sync_on_step=True)
+        self.accuracy = torchmetrics.Accuracy(dist_sync_on_step=True, average='weighted', num_classes=1, multiclass=False)
+        # self.accuracy_per_cls = torchmetrics.Accuracy(dist_sync_on_step=True, average=None, num_classes=1, multiclass=False)
+        self.auc = torchmetrics.AUROC(num_classes=2, average='weighted', compute_on_step=False,
+                                      dist_sync_on_step=True, pos_label=1)
+        # self.auc_per_cls = torchmetrics.AUROC(num_classes=max(num_classes, 2), average=None, compute_on_step=False,
+        #                                       dist_sync_on_step=True, pos_label=1)
         self.confusion = torchmetrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False,
                                                       dist_sync_on_step=True)
         if self.relevance_class:
             self.confusion_hard = torchmetrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False,
                                                                dist_sync_on_step=True)
+        self.patient_level_vali = patient_level_vali
+        if patient_level_vali:
+            self.all_val_results = []
 
     def forward(self, x):
         # use forward for inference/predictions
@@ -157,61 +92,113 @@ class Classifier(pl.LightningModule):
         logits = self.accumulated_logits(x, ignore_irrelevant='soft')
         logits = logits.squeeze(-1) if self.num_classes == 1 else logits
         loss = self.classification_loss(logits, y)
-        
-        self.log('train_loss', loss, on_epoch=True, sync_dist=True, )
-        self.log('train_acc', self.accuracy(self.prob_activation(logits), y.long()), on_epoch=True, prog_bar=False, sync_dist=True)
+        #acc_per_cls = self.accuracy_per_cls(self.prob_activation(logits), y.long())
+        self.log('train/loss', loss, on_step=False, on_epoch=True, sync_dist=True, )
+        self.log('train/acc', self.accuracy(self.prob_activation(logits), y.long()),
+                 on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+        #self.log('train/acc_0', acc_per_cls[0], on_epoch=True, prog_bar=False, sync_dist=True)
+        #self.log('train/acc_1', acc_per_cls[1], on_epoch=True, prog_bar=False, sync_dist=True)
         return loss
         
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        
+        if self.patient_level_vali and not self.trainer.sanity_checking:
+            target = y[..., 0]
+        else:
+            target = y
         # if len(y.shape) > 1: # batch has subbatch dimension
         #     y = y.float().mean(1)
         #     if self.num_classes > 1:
         #         y = y.long()# all labels in subbatch habe to be the same! mean of different labels does not work, since cross_entropy
         #                     # expects dtype long
-        if y.ndim > 1: # batch has subbatch dimension
+        if target.ndim > 1: # batch has subbatch dimension
             # all labels in subbatch have to be the same for num_classes >  1! mean of different labels does not work, since cross_entropy
             # expects dtype long
-            y = y.float().mean(1) if self.num_classes == 1 else y[:, 0]
+            target = target.float().mean(1) if self.num_classes == 1 else target[:, 0]
         else:
             if self.num_classes == 1:
-                y = y.float()
+                target = target.float()
                 
         logits_soft = self.accumulated_logits(x, ignore_irrelevant='soft')
         logits_soft = logits_soft.squeeze(-1) if self.num_classes == 1 else logits_soft
-        loss_soft = self.classification_loss(logits_soft, y)
+        loss_soft = self.classification_loss(logits_soft, target)
         
         if not self.trainer.sanity_checking:
-            name_extension = '_soft' if self.relevance_class else ''
-            #self.log('valid_loss'+name_extension, loss_soft, on_step=True, prog_bar=False)
-            self.log('valid_loss'+name_extension, loss_soft, prog_bar=True, sync_dist=True)
-            acc = self.accuracy(self.prob_activation(logits_soft), y.long())
-            #self.log('valid_acc'+name_extension, acc_soft, on_step=True, prog_bar=False)
-            self.log('valid_acc'+name_extension, acc, prog_bar=True, sync_dist=True)
-            self.auc(self.prob_activation(logits_soft), y.long())
             
-            self.confusion(self.prob_activation(logits_soft), y.long())
+            probs = self.prob_activation(logits_soft)
+            acc = self.accuracy(probs, target.long())
+            # acc_per_cls = self.accuracy_per_cls(probs, target.long())
+            self.auc(probs, target.long())
+            self.confusion(probs, target.long())
+            
+            if self.patient_level_vali:
+                results = torch.cat([logits_soft, y], dim=1)
+                self.all_val_results.append(results)
+            name_extension = '_soft' if self.relevance_class else ''
+            self.log('valid/loss'+name_extension, loss_soft, prog_bar=True, sync_dist=True)
+            #self.log('valid_acc'+name_extension, acc_soft, on_step=True, prog_bar=False)
+            self.log('valid/acc'+name_extension, acc, prog_bar=True, sync_dist=True)
+            # self.log('valid/acc_0'+name_extension, acc_per_cls[0], prog_bar=True, sync_dist=True)
+            # self.log('valid/acc_1'+name_extension, acc_per_cls[1], prog_bar=True, sync_dist=True)
+            # self.auc_per_cls(self.prob_activation(logits_soft), y.long())
+            
     
             if self.relevance_class:
                 logits_hard = self.accumulated_logits(x, ignore_irrelevant='hard')
                 logits_hard = logits_hard.squeeze(-1) if self.num_classes == 1 else logits_hard
-                loss_hard = self.classification_loss(logits_hard, y)
+                loss_hard = self.classification_loss(logits_hard, target)
         
                 #self.log('valid_loss_hard', loss_hard, on_step=True, prog_bar=False)
                 self.log('valid_loss_hard', loss_hard, prog_bar=False, logger=False, sync_dist=True)
-                acc_hard = self.accuracy(self.prob_activation(logits_hard), y.long())
+                acc_hard = self.accuracy(self.prob_activation(logits_hard), target.long())
                 #self.log('valid_acc_hard', acc_hard, on_step=True, prog_bar=False)
                 self.log('valid_acc_hard', acc_hard, prog_bar=False, logger=False, sync_dist=True)
-                auc_hard = self.auc(self.prob_activation(logits_soft), y.long())
+                auc_hard = self.auc(self.prob_activation(logits_soft), target.long())
                 self.log('valid_auc_hard', auc_hard, prog_bar=True, sync_dist=True)
-                self.confusion_hard(self.prob_activation(logits_hard), y.long())
-        
+                self.confusion_hard(self.prob_activation(logits_hard), target.long())
+                
+    def get_accumulated_prediction(self, logits, make_prob=False, accum_dim=0, pos_decision_boundary=0.5):
+        probs = self.prob_activation(logits)
+        pos_probs = probs if self.num_classes == 1 else probs[..., 1]
+        predicted_labels = (pos_probs >= pos_decision_boundary).float()
+        accum_pred = predicted_labels.mean(dim=accum_dim)
+        return accum_pred
+    
     def validation_epoch_end(self, outputs):
         if not self.trainer.sanity_checking:
+            
+            all_slides_preds = []
+            all_slides_targets = []
+            if self.patient_level_vali:
+                all_val_results = torch.cat(self.all_val_results, dim=0)
+                all_logits = all_val_results[..., :-2]
+                all_targets = all_val_results[..., -2].long()
+                all_slide_ns = all_val_results[..., -1].long()
+                for n in range(all_slide_ns.max()):
+                    slide_idxs = all_slide_ns == n
+                    if sum(slide_idxs) >= 10:
+                        all_slides_preds.append(self.get_accumulated_prediction(all_logits[slide_idxs]))
+                        all_slides_targets.append(all_targets[slide_idxs][0])
+                all_slides_preds = torch.tensor(all_slides_preds)
+                all_slides_targets = torch.tensor(all_slides_targets)
+                pl_tpr = all_slides_preds[all_slides_targets == 1].round().mean()
+                pl_fpr = all_slides_preds[all_slides_targets == 0].round().mean()
+                
+                pl_auroc = auroc(all_slides_preds, all_slides_targets, pos_label=1, average='weighted')
+                pl_acc = accuracy(all_slides_preds, all_slides_targets)
+                self.all_val_results = []
+                self.log('valid/pl_auc', pl_auroc, prog_bar=True, sync_dist=True)
+                self.log('valid/pl_acc', pl_acc, prog_bar=True, sync_dist=True)
+                self.log('valid/tpr', pl_tpr, prog_bar=True, sync_dist=True)
+                self.log('valid/fpr', pl_fpr, prog_bar=True, sync_dist=True)
+                
             confmat = self.confusion.compute()
             auc = self.auc.compute()
-            self.log('valid_auc', auc, prog_bar=True, sync_dist=True)
+                
+            self.log('valid/auc', auc, prog_bar=True, sync_dist=True)
+            # auc_per_cls = self.auc_per_cls.compute()
+            # self.log('valid/auc_0', auc_per_cls[0], prog_bar=True, sync_dist=True)
+            # self.log('valid/auc_1', auc_per_cls[1], prog_bar=True, sync_dist=True)
             
             name_extension = '_soft' if self.relevance_class else ''
             self.logger.experiment.add_text('confusion'+name_extension,
@@ -220,8 +207,10 @@ class Classifier(pl.LightningModule):
                                             self.current_epoch)
             self.confusion.reset()
             self.auc.reset()
+            #self.auc_per_cls.reset()
             self.accuracy.reset()
-    
+            #self.accuracy_per_cls.reset()
+            
             if self.relevance_class:
                 confmat = self.confusion_hard.compute()
                 self.logger.experiment.add_text('confusion_hard',
