@@ -7,7 +7,7 @@ import pytorch_lightning as pl
 
         
 class Classifier(pl.LightningModule):
-    def __init__(self, classifier_net, num_classes=2, relevance_class=False, optimizer={'AdamW': {'lr': 1e-5}}, lr=1e-3,
+    def __init__(self, classifier_net, num_classes=2, relevance_class=False, optimizer={'AdamW': {'lr': 1e-5}},
                  patient_level_vali=True, learn_dec_bound=False):
         super(Classifier, self).__init__()
         self.save_hyperparameters()
@@ -19,7 +19,6 @@ class Classifier(pl.LightningModule):
         self.num_classes = num_classes
         self.relevance_class = relevance_class
         self.optimizer_settings = optimizer
-        self.lr = lr
         self.prob_activation = torch.nn.Sigmoid() if num_classes == 1 else torch.nn.Softmax(dim=-1)
         self.classification_loss = torch.nn.BCEWithLogitsLoss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
         self.accuracy = torchmetrics.Accuracy(dist_sync_on_step=True)
@@ -99,20 +98,15 @@ class Classifier(pl.LightningModule):
         
     def validation_step(self, batch, batch_idx):
         x, y = batch
-        if self.patient_level_vali and not self.trainer.sanity_checking:
+        if y.ndim > (1 + self.patient_level_vali): # batch has subbatch dimension
+            y = y[:, 0, ...]
+            
+        if self.patient_level_vali:
             target = y[..., 0]
         else:
             target = y
-        # if len(y.shape) > 1: # batch has subbatch dimension
-        #     y = y.float().mean(1)
-        #     if self.num_classes > 1:
-        #         y = y.long()# all labels in subbatch habe to be the same! mean of different labels does not work, since cross_entropy
-        #                     # expects dtype long
-        if target.ndim > 1: # batch has subbatch dimension
-            # all labels in subbatch have to be the same for num_classes >  1! mean of different labels does not work, since cross_entropy
-            # expects dtype long
-            target = target.float().mean(1) if self.num_classes == 1 else target[:, 0]
-        elif self.num_classes == 1:
+    
+        if self.num_classes == 1:
             target = target.float()
                 
         logits_soft = self.accumulated_logits(x, ignore_irrelevant='soft')
