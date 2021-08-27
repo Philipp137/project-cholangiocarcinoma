@@ -8,10 +8,14 @@ import pytorch_lightning as pl
         
 class Classifier(pl.LightningModule):
     def __init__(self, classifier_net, num_classes=2, relevance_class=False, optimizer={'AdamW': {'lr': 1e-5}}, lr=1e-3,
-                 patient_level_vali=True):
+                 patient_level_vali=True, learn_dec_bound=False):
         super(Classifier, self).__init__()
         self.save_hyperparameters()
         self.classifier_net = classifier_net
+        self.tile_decision_boundary = torch.nn.Parameter(torch.tensor(0.5), requires_grad=( False and
+            (isinstance(learn_dec_bound, bool) and learn_dec_bound) or (isinstance(learn_dec_bound, list) and 'tile' in learn_dec_bound)))
+        self.slide_decision_boundary = torch.nn.Parameter(torch.tensor(0.5), requires_grad=(
+            (isinstance(learn_dec_bound, bool) and learn_dec_bound) or (isinstance(learn_dec_bound, list) and 'slide' in learn_dec_bound)))
         self.num_classes = num_classes
         self.relevance_class = relevance_class
         self.optimizer_settings = optimizer
@@ -49,7 +53,7 @@ class Classifier(pl.LightningModule):
         logits = self.classifier_net(x)
     
         if len(x_shape) > 4:  # batch has subbatch dimension
-            logits = logits.view([*x_shape[:2], logits.shape[-1]])  # unstack subbatch dimension and mean over it.
+            logits = logits.view([*x_shape[:2], logits.shape[-1]])  # unstack subbatch dimension.
             
         return logits
         
@@ -80,7 +84,7 @@ class Classifier(pl.LightningModule):
         if y.ndim > 1: # batch has subbatch dimension
             # all labels in subbatch have to be the same for num_classes >  1! mean of different labels does not work, since cross_entropy
             # expects dtype long
-            y = y.float().mean(1) if self.num_classes == 1 else y[:, 0]
+            y = y[:, 0]
         else:
             if self.num_classes == 1:
                 y = y.float()
@@ -153,13 +157,14 @@ class Classifier(pl.LightningModule):
             probs = self.prob_activation(logits)
             accum_pred = probs.mean(dim=accum_dim)
         elif method == 'mean_logits':
-            accum_pred = logits.mean(dim=accum_dim)
+            accum_pred = self.prob_activation(logits.mean(dim=accum_dim))
         return accum_pred
     
     def validation_epoch_end(self, outputs):
         if self.trainer.sanity_checking:
             return
-        all_slides_preds = []
+        methods = ['mean_labels', 'mean_probs', 'mean_logits']
+        all_slides_probs_by_method = [[] for _ in range(len(methods))]
         all_slides_targets = []
         if self.patient_level_vali:
             all_val_results = torch.cat(self.all_val_results, dim=0)
@@ -169,24 +174,28 @@ class Classifier(pl.LightningModule):
             for n in range(all_slide_ns.max()):
                 slide_idxs = all_slide_ns == n
                 if sum(slide_idxs) >= 10:
-                    all_slides_preds.append(self.get_accumulated_prediction(all_logits[slide_idxs], method='mean_labels'))
+                    for m, method in enumerate(methods):
+                        all_slides_probs_by_method[m].append(self.get_accumulated_prediction(all_logits[slide_idxs], method=method))
                     all_slides_targets.append(all_targets[slide_idxs][0])
-            all_slides_preds = torch.tensor(all_slides_preds)
-            all_slides_targets = torch.tensor(all_slides_targets)
-            tpr = self.prob_activation(all_logits[all_targets == 1]).round().mean()
-            fpr = self.prob_activation(all_logits[all_targets == 0]).round().mean()
-            pl_tpr = all_slides_preds[all_slides_targets == 1].round().mean()
-            pl_fpr = all_slides_preds[all_slides_targets == 0].round().mean()
+            all_slides_probs_by_method = torch.stack([torch.stack(preds, 0) for preds in all_slides_probs_by_method], dim=0)
+            all_slides_targets = torch.stack(all_slides_targets, dim=0)
+            tpr = self.prob_activation(all_logits)[all_targets == 1, 1].median()
+            fpr = self.prob_activation(all_logits)[all_targets == 0, 1].median()
+            self.log('valid/pos_score', tpr, prog_bar=True, sync_dist=True)
+            self.log('valid/f_pos_score', fpr, prog_bar=True, sync_dist=True)
             
-            pl_auroc = auroc(all_slides_preds, all_slides_targets, pos_label=1)
-            pl_acc = accuracy(all_slides_preds, all_slides_targets)
-            self.all_val_results = []
-            self.log('pl_valid/auc', pl_auroc, prog_bar=True, sync_dist=True)
-            self.log('pl_valid/acc', pl_acc, prog_bar=True, sync_dist=True)
-            self.log('pl_valid/tpr', pl_tpr, prog_bar=True, sync_dist=True)
-            self.log('pl_valid/fpr', pl_fpr, prog_bar=True, sync_dist=True)
-            self.log('valid/tpr', tpr, prog_bar=True, sync_dist=True)
-            self.log('valid/fpr', fpr, prog_bar=True, sync_dist=True)
+            for m, method in enumerate(methods):
+                all_slides_probs = all_slides_probs_by_method[m, ...]
+                pl_tpr = all_slides_probs[all_slides_targets == 1, 1].median()
+                pl_fpr = all_slides_probs[all_slides_targets == 0, 1].median()
+                
+                pl_auroc = auroc(all_slides_probs, all_slides_targets, pos_label=1, num_classes=2)
+                pl_acc = accuracy(all_slides_probs, all_slides_targets)
+                self.all_val_results = []
+                self.log('pl_valid_' + method + '/auroc', pl_auroc, prog_bar=False, sync_dist=True)
+                self.log('pl_valid_' + method + '/acc', pl_acc, prog_bar=False, sync_dist=True)
+                self.log('pl_valid_' + method + '/pos_score', pl_tpr, prog_bar=False, sync_dist=True)
+                self.log('pl_valid_' + method + '/f_pos_score', pl_fpr, prog_bar=False, sync_dist=True)
             
         confmat = self.confusion.compute()
         auc = self.auc.compute()
