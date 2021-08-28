@@ -79,7 +79,11 @@ if __name__ =="__main__":
             num_classes=model_conf['num_classes'],
             relevance_class=model_conf['relevance_class'],
             optimizer=model_conf['optimizer'],
-            patient_level_vali=True
+            patient_level_vali=True,
+            batch_size=trainer_conf['batch_size'],
+            val_batch_size=trainer_conf['val_batch_size'],
+            subbatch_size=trainer_conf['subbatch_size'],
+            val_subbatch_size=trainer_conf['val_subbatch_size'],
     )
     
     accelerator = 'ddp' if distributed else None

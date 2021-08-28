@@ -8,7 +8,8 @@ import pytorch_lightning as pl
         
 class Classifier(pl.LightningModule):
     def __init__(self, classifier_net, num_classes=2, relevance_class=False, optimizer={'AdamW': {'lr': 1e-5}},
-                 patient_level_vali=True, learn_dec_bound=False):
+                 patient_level_vali=True, learn_dec_bound=False, batch_size=0, subbatch_size=0, val_batch_size=0, val_subbatch_size=0,
+                 subbatch_mean='logits'):
         super(Classifier, self).__init__()
         self.save_hyperparameters()
         self.classifier_net = classifier_net
@@ -19,6 +20,12 @@ class Classifier(pl.LightningModule):
         self.num_classes = num_classes
         self.relevance_class = relevance_class
         self.optimizer_settings = optimizer
+        # batch_sizes are only put here so they are logged in tensorboard as hparams
+        self.batch_size = batch_size
+        self.subbatch_size = subbatch_size
+        self.val_batch_size = val_batch_size
+        self.val_subbatch_size = val_subbatch_size
+        self.subbatch_mean = subbatch_mean if subbatch_size else None
         self.prob_activation = torch.nn.Sigmoid() if num_classes == 1 else torch.nn.Softmax(dim=-1)
         self.classification_loss = torch.nn.BCEWithLogitsLoss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
         self.accuracy = torchmetrics.Accuracy(dist_sync_on_step=True)
