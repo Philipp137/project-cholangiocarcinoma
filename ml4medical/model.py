@@ -27,7 +27,10 @@ class Classifier(pl.LightningModule):
         self.val_subbatch_size = val_subbatch_size
         self.subbatch_mean = subbatch_mean if subbatch_size else None
         self.prob_activation = torch.nn.Sigmoid() if num_classes == 1 else torch.nn.Softmax(dim=-1)
-        self.classification_loss = torch.nn.BCEWithLogitsLoss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
+        if not self.subbatch_mean or self.subbatch_mean == 'logits':
+            self.classification_loss = torch.nn.BCEWithLogitsLoss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
+        elif self.subbatch_mean == 'probs':
+            self.classification_loss = torch.nn.BCELoss() if num_classes == 1 else torch.nn.NLLLoss()
         self.accuracy = torchmetrics.Accuracy(dist_sync_on_step=True)
         self.auc = torchmetrics.AUROC(num_classes=2, compute_on_step=False, dist_sync_on_step=True, pos_label=1)
         self.confusion = torchmetrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False,
@@ -86,26 +89,36 @@ class Classifier(pl.LightningModule):
 
     def training_step(self, batch, batch_idx):
         x, y = batch
-
+        
         if y.ndim > 1: # batch has subbatch dimension
+            has_subbatch = True
             # all labels in subbatch have to be the same for num_classes >  1! mean of different labels does not work, since cross_entropy
             # expects dtype long
             y = y[:, 0]
         else:
+            has_subbatch = False
             if self.num_classes == 1:
                 y = y.float()
-        
-        logits = self.accumulated_logits(x, ignore_irrelevant='soft')
-        logits = logits.squeeze(-1) if self.num_classes == 1 else logits
-        loss = self.classification_loss(logits, y)
+                
+        pred = self.logits(x)
+        if has_subbatch:
+            if self.subbatch_mean == 'probs':
+                pred = self.get_accumulated_prediction(pred, method='mean_probs', accum_dim=1)
+            else:
+                pred = self.get_accumulated_prediction(pred, method='mean_logits', accum_dim=1, make_prob=False)
+        # logits = self.accumulated_logits(x, ignore_irrelevant='soft')
+        pred = pred.squeeze(-1) if self.num_classes == 1 else pred
+        loss = self.classification_loss(pred, y)
         self.log('train/loss', loss, on_step=False, on_epoch=True, sync_dist=True, )
-        self.log('train/acc', self.accuracy(logits, y.long()),
+        self.log('train/acc', self.accuracy(pred, y.long()),
                  on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
         return loss
         
     def validation_step(self, batch, batch_idx):
         x, y = batch
+        has_subbatch = False
         if y.ndim > (1 + self.patient_level_vali): # batch has subbatch dimension
+            has_subbatch = True
             y = y[:, 0, ...]
             
         if self.patient_level_vali:
@@ -115,39 +128,45 @@ class Classifier(pl.LightningModule):
     
         if self.num_classes == 1:
             target = target.float()
-                
-        logits_soft = self.accumulated_logits(x, ignore_irrelevant='soft')
-        logits_soft = logits_soft.squeeze(-1) if self.num_classes == 1 else logits_soft
-        loss_soft = self.classification_loss(logits_soft, target)
+
+        pred = self.logits(x)
+        if has_subbatch:
+            if self.subbatch_mean == 'probs':
+                pred = self.get_accumulated_prediction(pred, method='mean_probs', accum_dim=1)
+            else:
+                pred = self.get_accumulated_prediction(pred, method='mean_logits', accum_dim=1, make_prob=False)
+        # logits = self.accumulated_logits(x, ignore_irrelevant='soft')
+        pred = pred.squeeze(-1) if self.num_classes == 1 else pred
+        loss = self.classification_loss(pred, target)
         
         if not self.trainer.sanity_checking:
-            acc = self.accuracy(logits_soft, target.long())
-            self.auc(logits_soft, target.long())
-            self.confusion(logits_soft, target.long())
+            prob = self.prob_activation(pred) if not self.subbatch_mean == 'probs' else pred
+            acc = self.accuracy(pred, target.long())
+            self.auc(prob, target.long())
+            self.confusion(pred, target.long())
             
             if self.patient_level_vali:
-                results = torch.cat([logits_soft, y], dim=1)
+                results = torch.cat([pred, y], dim=1)
                 self.all_val_results.append(results)
             name_extension = '_soft' if self.relevance_class else ''
-            self.log('valid/loss'+name_extension, loss_soft, prog_bar=True, sync_dist=True)
+            self.log('valid/loss'+name_extension, loss, prog_bar=True, sync_dist=True)
             self.log('valid/acc'+name_extension, acc, prog_bar=True, sync_dist=True)
             
     
-            if self.relevance_class:
-                logits_hard = self.accumulated_logits(x, ignore_irrelevant='hard')
-                logits_hard = logits_hard.squeeze(-1) if self.num_classes == 1 else logits_hard
-                loss_hard = self.classification_loss(logits_hard, target)
-        
-                #self.log('valid_loss_hard', loss_hard, on_step=True, prog_bar=False)
-                self.log('valid_loss_hard', loss_hard, prog_bar=False, logger=False, sync_dist=True)
-                acc_hard = self.accuracy(self.prob_activation(logits_hard), target.long())
-                #self.log('valid_acc_hard', acc_hard, on_step=True, prog_bar=False)
-                self.log('valid_acc_hard', acc_hard, prog_bar=False, logger=False, sync_dist=True)
-                auc_hard = self.auc(self.prob_activation(logits_soft), target.long())
-                self.log('valid_auc_hard', auc_hard, prog_bar=True, sync_dist=True)
-                self.confusion_hard(self.prob_activation(logits_hard), target.long())
+            # if self.relevance_class:
+                # logits_hard = self.accumulated_logits(x, ignore_irrelevant='hard')
+                # logits_hard = logits_hard.squeeze(-1) if self.num_classes == 1 else logits_hard
+                # loss_hard = self.classification_loss(logits_hard, target)
+                #
+                # self.log('valid_loss_hard', loss_hard, prog_bar=False, logger=False, sync_dist=True)
+                # acc_hard = self.accuracy(self.prob_activation(logits_hard), target.long())
+                # self.log('valid_acc_hard', acc_hard, prog_bar=False, logger=False, sync_dist=True)
+                # auc_hard = self.auc(self.prob_activation(logits_soft), target.long())
+                # self.log('valid_auc_hard', auc_hard, prog_bar=True, sync_dist=True)
+                # self.confusion_hard(self.prob_activation(logits_hard), target.long())
                 
-    def get_accumulated_prediction(self, logits, method, accum_dim=0, pos_decision_boundary=0.5):
+                
+    def get_accumulated_prediction(self, logits, method, accum_dim=0, pos_decision_boundary=0.5, make_prob=True):
         if method == 'mean_labels':
             probs = self.prob_activation(logits)
             pos_probs = probs if self.num_classes == 1 else probs[..., 1]
@@ -158,7 +177,9 @@ class Classifier(pl.LightningModule):
             probs = self.prob_activation(logits)
             accum_pred = probs.mean(dim=accum_dim)
         elif method == 'mean_logits':
-            accum_pred = self.prob_activation(logits.mean(dim=accum_dim))
+            accum_pred = logits.mean(dim=accum_dim)
+            if make_prob:
+                accum_pred = self.prob_activation(accum_pred)
         return accum_pred
     
     def validation_epoch_end(self, outputs):

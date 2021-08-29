@@ -84,6 +84,7 @@ if __name__ =="__main__":
             val_batch_size=trainer_conf['val_batch_size'],
             subbatch_size=trainer_conf['subbatch_size'],
             val_subbatch_size=trainer_conf['val_subbatch_size'],
+            subbatch_mean=model_conf['subbatch_mean']
     )
     
     accelerator = 'ddp' if distributed else None
