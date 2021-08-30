@@ -131,8 +131,8 @@ class Classifier(pl.LightningModule):
             pred = self.get_accumulated_prediction(pred, method='mean_logits', accum_dim=1, make_prob=self.subbatch_mean == 'probs')
         # logits = self.accumulated_logits(x, ignore_irrelevant='soft')
         pred = pred.squeeze(-1) if self.num_classes == 1 else pred
-        loss = self.classification_loss(pred, target) if not self.subbatch_mean == 'probs' else \
-               self.classification_loss(torch.log(pred), target)
+        loss = self.classification_loss(torch.log(pred), target) if self.subbatch_mean == 'probs' and self.val_subbatch_size else \
+               self.classification_loss(pred, target)
         
         if not self.trainer.sanity_checking:
             prob = self.prob_activation(pred) if not self.subbatch_mean == 'probs' else pred
@@ -195,7 +195,7 @@ class Classifier(pl.LightningModule):
                 if sum(slide_idxs) >= 10:
                     for m, method in enumerate(methods):
                         all_slides_probs_by_method[m].append(self.get_accumulated_prediction(all_logits[slide_idxs], method=method,
-                                                                                             make_prob=self.subbatch_mean != 'probs'))
+                            make_prob=self.subbatch_mean != 'probs' or not self.val_subbatch_size))
                     all_slides_targets.append(all_targets[slide_idxs][0])
             all_slides_probs_by_method = torch.stack([torch.stack(preds, 0) for preds in all_slides_probs_by_method], dim=0)
             all_slides_targets = torch.stack(all_slides_targets, dim=0)
@@ -209,7 +209,7 @@ class Classifier(pl.LightningModule):
                 pl_tpr = all_slides_probs[all_slides_targets == 1, 1].median()
                 pl_fpr = all_slides_probs[all_slides_targets == 0, 1].median()
                 
-                pl_auroc = auroc(all_slides_probs, all_slides_targets, pos_label=1, num_classes=2)
+                pl_auroc = auroc(all_slides_probs, all_slides_targets, num_classes=2)
                 pl_acc = accuracy(all_slides_probs, all_slides_targets)
                 self.all_val_results = []
                 self.log('pl_valid_' + method + '/auroc', pl_auroc, prog_bar=False, sync_dist=True)
