@@ -108,7 +108,7 @@ class Classifier(pl.LightningModule):
                 pred = self.get_accumulated_prediction(pred, method='mean_logits', accum_dim=1, make_prob=False)
         # logits = self.accumulated_logits(x, ignore_irrelevant='soft')
         pred = pred.squeeze(-1) if self.num_classes == 1 else pred
-        loss = self.classification_loss(pred, y)
+        loss = self.classification_loss(pred, y) if not self.subbatch_mean == 'probs' else self.classification_loss(torch.log(pred), y)
         self.log('train/loss', loss, on_step=False, on_epoch=True, sync_dist=True, )
         self.log('train/acc', self.accuracy(pred, y.long()),
                  on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
@@ -137,7 +137,8 @@ class Classifier(pl.LightningModule):
                 pred = self.get_accumulated_prediction(pred, method='mean_logits', accum_dim=1, make_prob=False)
         # logits = self.accumulated_logits(x, ignore_irrelevant='soft')
         pred = pred.squeeze(-1) if self.num_classes == 1 else pred
-        loss = self.classification_loss(pred, target)
+        loss = self.classification_loss(pred, target) if not self.subbatch_mean == 'probs' else \
+               self.classification_loss(torch.log(pred), target)
         
         if not self.trainer.sanity_checking:
             prob = self.prob_activation(pred) if not self.subbatch_mean == 'probs' else pred
