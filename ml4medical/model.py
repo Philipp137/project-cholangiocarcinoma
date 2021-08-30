@@ -102,10 +102,7 @@ class Classifier(pl.LightningModule):
                 
         pred = self.logits(x)
         if has_subbatch:
-            if self.subbatch_mean == 'probs':
-                pred = self.get_accumulated_prediction(pred, method='mean_probs', accum_dim=1)
-            else:
-                pred = self.get_accumulated_prediction(pred, method='mean_logits', accum_dim=1, make_prob=False)
+            pred = self.get_accumulated_prediction(pred, method='mean_logits', accum_dim=1, make_prob=self.subbatch_mean == 'probs')
         # logits = self.accumulated_logits(x, ignore_irrelevant='soft')
         pred = pred.squeeze(-1) if self.num_classes == 1 else pred
         loss = self.classification_loss(pred, y) if not self.subbatch_mean == 'probs' else self.classification_loss(torch.log(pred), y)
@@ -131,10 +128,7 @@ class Classifier(pl.LightningModule):
 
         pred = self.logits(x)
         if has_subbatch:
-            if self.subbatch_mean == 'probs':
-                pred = self.get_accumulated_prediction(pred, method='mean_probs', accum_dim=1)
-            else:
-                pred = self.get_accumulated_prediction(pred, method='mean_logits', accum_dim=1, make_prob=False)
+            pred = self.get_accumulated_prediction(pred, method='mean_logits', accum_dim=1, make_prob=self.subbatch_mean == 'probs')
         # logits = self.accumulated_logits(x, ignore_irrelevant='soft')
         pred = pred.squeeze(-1) if self.num_classes == 1 else pred
         loss = self.classification_loss(pred, target) if not self.subbatch_mean == 'probs' else \
@@ -167,18 +161,20 @@ class Classifier(pl.LightningModule):
                 # self.confusion_hard(self.prob_activation(logits_hard), target.long())
                 
                 
-    def get_accumulated_prediction(self, logits, method, accum_dim=0, pos_decision_boundary=0.5, make_prob=True):
+    def get_accumulated_prediction(self, preds, method, accum_dim=0, pos_decision_boundary=0.5, make_prob=True):
         if method == 'mean_labels':
-            probs = self.prob_activation(logits)
-            pos_probs = probs if self.num_classes == 1 else probs[..., 1]
+            if make_prob:
+                preds = self.prob_activation(preds)
+            pos_probs = preds if self.num_classes == 1 else preds[..., 1]
             predicted_labels = (pos_probs >= pos_decision_boundary).float()
             accum_pos_prob = predicted_labels.mean(dim=accum_dim)
             accum_pred = torch.stack([1 - accum_pos_prob, accum_pos_prob], dim=-1)
         elif method == 'mean_probs':
-            probs = self.prob_activation(logits)
-            accum_pred = probs.mean(dim=accum_dim)
+            if make_prob:
+                preds = self.prob_activation(preds)
+            accum_pred = preds.mean(dim=accum_dim)
         elif method == 'mean_logits':
-            accum_pred = logits.mean(dim=accum_dim)
+            accum_pred = preds.mean(dim=accum_dim)
             if make_prob:
                 accum_pred = self.prob_activation(accum_pred)
         return accum_pred
@@ -198,7 +194,8 @@ class Classifier(pl.LightningModule):
                 slide_idxs = all_slide_ns == n
                 if sum(slide_idxs) >= 10:
                     for m, method in enumerate(methods):
-                        all_slides_probs_by_method[m].append(self.get_accumulated_prediction(all_logits[slide_idxs], method=method))
+                        all_slides_probs_by_method[m].append(self.get_accumulated_prediction(all_logits[slide_idxs], method=method),
+                                                             make_prob=self.subbatch_mean != 'probs')
                     all_slides_targets.append(all_targets[slide_idxs][0])
             all_slides_probs_by_method = torch.stack([torch.stack(preds, 0) for preds in all_slides_probs_by_method], dim=0)
             all_slides_targets = torch.stack(all_slides_targets, dim=0)

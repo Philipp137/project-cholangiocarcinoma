@@ -8,6 +8,7 @@ class ResNet(nn.Sequential):
         """
         Build one of the resnet variants in torchvision.models.resnet
         """
+        self.pretrained = pretrained
         super(ResNet, self).__init__()
         if pretrained and (num_classes != 1000):
             self.add_module('nn', getattr(models, variant)(num_classes=1000, pretrained=pretrained))
