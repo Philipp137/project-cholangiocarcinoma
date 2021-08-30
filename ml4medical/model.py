@@ -194,8 +194,8 @@ class Classifier(pl.LightningModule):
                 slide_idxs = all_slide_ns == n
                 if sum(slide_idxs) >= 10:
                     for m, method in enumerate(methods):
-                        all_slides_probs_by_method[m].append(self.get_accumulated_prediction(all_logits[slide_idxs], method=method),
-                                                             make_prob=self.subbatch_mean != 'probs')
+                        all_slides_probs_by_method[m].append(self.get_accumulated_prediction(all_logits[slide_idxs], method=method,
+                                                                                             make_prob=self.subbatch_mean != 'probs'))
                     all_slides_targets.append(all_targets[slide_idxs][0])
             all_slides_probs_by_method = torch.stack([torch.stack(preds, 0) for preds in all_slides_probs_by_method], dim=0)
             all_slides_targets = torch.stack(all_slides_targets, dim=0)
