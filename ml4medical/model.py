@@ -131,8 +131,7 @@ class Classifier(pl.LightningModule):
             pred = self.get_accumulated_prediction(pred, method='mean_logits', accum_dim=1, make_prob=self.subbatch_mean == 'probs')
         # logits = self.accumulated_logits(x, ignore_irrelevant='soft')
         pred = pred.squeeze(-1) if self.num_classes == 1 else pred
-        loss = self.classification_loss(torch.log(pred), target) if self.subbatch_mean == 'probs' and self.val_subbatch_size else \
-               self.classification_loss(pred, target)
+        loss = self.classification_loss(torch.log(pred), target) if self.subbatch_mean == 'probs' else self.classification_loss(pred, target)
         
         if not self.trainer.sanity_checking:
             prob = self.prob_activation(pred) if not self.subbatch_mean == 'probs' else pred
