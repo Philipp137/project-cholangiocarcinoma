@@ -32,15 +32,13 @@ class Classifier(pl.LightningModule):
         elif self.subbatch_mean == 'probs':
             self.classification_loss = torch.nn.BCELoss() if num_classes == 1 else torch.nn.NLLLoss()
         self.accuracy = torchmetrics.Accuracy(dist_sync_on_step=True)
-        self.auc = torchmetrics.AUROC(num_classes=2, compute_on_step=False, dist_sync_on_step=True, pos_label=1)
         self.confusion = torchmetrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False,
                                                       dist_sync_on_step=True)
         if self.relevance_class:
             self.confusion_hard = torchmetrics.ConfusionMatrix(num_classes=max(num_classes, 2), normalize='true', compute_on_step=False,
                                                                dist_sync_on_step=True)
         self.patient_level_vali = patient_level_vali
-        if patient_level_vali:
-            self.all_val_results = []
+        self.all_val_results = []
 
     def forward(self, x):
         # use forward for inference/predictions
@@ -102,7 +100,8 @@ class Classifier(pl.LightningModule):
                 
         pred = self.logits(x)
         if has_subbatch:
-            pred = self.get_accumulated_prediction(pred, method='mean_logits', accum_dim=1, make_prob=self.subbatch_mean == 'probs')
+            pred = self.get_accumulated_prediction(pred, method='mean_' + self.subbatch_mean, accum_dim=1,
+                                                   make_prob=self.subbatch_mean == 'probs')
         # logits = self.accumulated_logits(x, ignore_irrelevant='soft')
         pred = pred.squeeze(-1) if self.num_classes == 1 else pred
         loss = self.classification_loss(pred, y) if not self.subbatch_mean == 'probs' else self.classification_loss(torch.log(pred), y)
@@ -128,23 +127,16 @@ class Classifier(pl.LightningModule):
 
         pred = self.logits(x)
         if has_subbatch:
-            pred = self.get_accumulated_prediction(pred, method='mean_logits', accum_dim=1, make_prob=self.subbatch_mean == 'probs')
+            pred = self.get_accumulated_prediction(pred, method='mean_' + self.subbatch_mean, accum_dim=1,
+                                                   make_prob=self.subbatch_mean == 'probs')
         # logits = self.accumulated_logits(x, ignore_irrelevant='soft')
         pred = pred.squeeze(-1) if self.num_classes == 1 else pred
-        loss = self.classification_loss(torch.log(pred), target) if self.subbatch_mean == 'probs' else self.classification_loss(pred, target)
         
         if not self.trainer.sanity_checking:
-            prob = self.prob_activation(pred) if not self.subbatch_mean == 'probs' else pred
-            acc = self.accuracy(pred, target.long())
-            self.auc(prob, target.long())
             self.confusion(pred, target.long())
             
-            if self.patient_level_vali:
-                results = torch.cat([pred, y], dim=1)
-                self.all_val_results.append(results)
-            name_extension = '_soft' if self.relevance_class else ''
-            self.log('valid/loss'+name_extension, loss, prog_bar=True, sync_dist=True)
-            self.log('valid/acc'+name_extension, acc, prog_bar=True, sync_dist=True)
+            results = torch.cat([pred, y], dim=1)
+            self.all_val_results.append(results)
             
     
             # if self.relevance_class:
@@ -167,7 +159,7 @@ class Classifier(pl.LightningModule):
             pos_probs = preds if self.num_classes == 1 else preds[..., 1]
             predicted_labels = (pos_probs >= pos_decision_boundary).float()
             accum_pos_prob = predicted_labels.mean(dim=accum_dim)
-            accum_pred = torch.stack([1 - accum_pos_prob, accum_pos_prob], dim=-1)
+            accum_pred = torch.stack([1 - accum_pos_prob, accum_pos_prob], dim=-1) if self.num_classes == 2 else accum_pos_prob
         elif method == 'mean_probs':
             if make_prob:
                 preds = self.prob_activation(preds)
@@ -181,44 +173,51 @@ class Classifier(pl.LightningModule):
     def validation_epoch_end(self, outputs):
         if self.trainer.sanity_checking:
             return
+        all_val_results = torch.cat(self.all_val_results, dim=0)
+        all_preds = all_val_results[..., :-2]
+        all_probs = all_preds if self.val_subbatch_size and self.subbatch_mean == 'probs' else self.prob_activation(all_preds)
         methods = ['mean_labels', 'mean_probs', 'mean_logits']
         all_slides_probs_by_method = [[] for _ in range(len(methods))]
         all_slides_targets = []
         if self.patient_level_vali:
-            all_val_results = torch.cat(self.all_val_results, dim=0)
-            all_logits = all_val_results[..., :-2]
             all_targets = all_val_results[..., -2].long()
             all_slide_ns = all_val_results[..., -1].long()
             for n in range(all_slide_ns.max()):
                 slide_idxs = all_slide_ns == n
-                if sum(slide_idxs) >= 10:
+                if self.val_subbatch_size > 10 or sum(slide_idxs) >= 10:
                     for m, method in enumerate(methods):
-                        all_slides_probs_by_method[m].append(self.get_accumulated_prediction(all_logits[slide_idxs], method=method,
+                        all_slides_probs_by_method[m].append(self.get_accumulated_prediction(all_preds[slide_idxs], method=method,
                             make_prob=self.subbatch_mean != 'probs' or not self.val_subbatch_size))
                     all_slides_targets.append(all_targets[slide_idxs][0])
             all_slides_probs_by_method = torch.stack([torch.stack(preds, 0) for preds in all_slides_probs_by_method], dim=0)
             all_slides_targets = torch.stack(all_slides_targets, dim=0)
-            tpr = self.prob_activation(all_logits)[all_targets == 1, 1].median()
-            fpr = self.prob_activation(all_logits)[all_targets == 0, 1].median()
-            self.log('valid/pos_score', tpr, prog_bar=True, sync_dist=True)
-            self.log('valid/f_pos_score', fpr, prog_bar=True, sync_dist=True)
             
             for m, method in enumerate(methods):
                 all_slides_probs = all_slides_probs_by_method[m, ...]
                 pl_tpr = all_slides_probs[all_slides_targets == 1, 1].median()
                 pl_fpr = all_slides_probs[all_slides_targets == 0, 1].median()
                 
-                pl_auroc = auroc(all_slides_probs, all_slides_targets, num_classes=2)
+                pl_auroc = auroc(all_slides_probs, all_slides_targets, num_classes=self.num_classes)
                 pl_acc = accuracy(all_slides_probs, all_slides_targets)
                 self.all_val_results = []
                 self.log('pl_valid_' + method + '/auroc', pl_auroc, prog_bar=False, sync_dist=True)
                 self.log('pl_valid_' + method + '/acc', pl_acc, prog_bar=False, sync_dist=True)
                 self.log('pl_valid_' + method + '/pos_score', pl_tpr, prog_bar=False, sync_dist=True)
                 self.log('pl_valid_' + method + '/f_pos_score', pl_fpr, prog_bar=False, sync_dist=True)
-            
+
+        tps = all_probs[all_targets == 1, 1].median()
+        fps = all_probs[all_targets == 0, 1].median()
+
+        loss = self.classification_loss(torch.log(all_probs), all_targets) if self.subbatch_mean == 'probs' else \
+               self.classification_loss(all_preds, all_targets)
         confmat = self.confusion.compute()
-        auc = self.auc.compute()
-        
+        auc = auroc(all_preds, all_targets, num_classes=self.num_classes)
+        acc = accuracy(all_preds, all_targets)
+
+        self.log('valid/loss', loss, prog_bar=True, sync_dist=True)
+        self.log('valid/pos_score', tps, prog_bar=True, sync_dist=True)
+        self.log('valid/f_pos_score', fps, prog_bar=True, sync_dist=True)
+        self.log('valid/acc', acc, prog_bar=True, sync_dist=True)
         self.log('valid/auc', auc, prog_bar=True, sync_dist=True)
         
         name_extension = '_soft' if self.relevance_class else ''
@@ -227,8 +226,6 @@ class Classifier(pl.LightningModule):
                                         f'1-1: {confmat[1, 1].item():.3f};    1-0: {confmat[1, 0].item():.3f}',
                                         self.current_epoch)
         self.confusion.reset()
-        self.auc.reset()
-        self.accuracy.reset()
         
         if self.relevance_class:
             confmat = self.confusion_hard.compute()
