@@ -184,7 +184,7 @@ class Classifier(pl.LightningModule):
         if self.patient_level_vali:
             for n in range(all_slide_ns.max()):
                 slide_idxs = all_slide_ns == n
-                if self.val_subbatch_size > 10 or sum(slide_idxs) >= 10:
+                if sum(slide_idxs) > 0 and (self.val_subbatch_size > 10 or sum(slide_idxs) >= 10):
                     for m, method in enumerate(methods):
                         all_slides_probs_by_method[m].append(self.get_accumulated_prediction(all_preds[slide_idxs], method=method,
                             make_prob=self.subbatch_mean != 'probs' or not self.val_subbatch_size))
