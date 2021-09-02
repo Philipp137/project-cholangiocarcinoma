@@ -176,12 +176,12 @@ class Classifier(pl.LightningModule):
         all_val_results = torch.cat(self.all_val_results, dim=0)
         all_preds = all_val_results[..., :-2]
         all_probs = all_preds if self.val_subbatch_size and self.subbatch_mean == 'probs' else self.prob_activation(all_preds)
+        all_targets = all_val_results[..., -2].long()
+        all_slide_ns = all_val_results[..., -1].long()
         methods = ['mean_labels', 'mean_probs', 'mean_logits']
         all_slides_probs_by_method = [[] for _ in range(len(methods))]
         all_slides_targets = []
         if self.patient_level_vali:
-            all_targets = all_val_results[..., -2].long()
-            all_slide_ns = all_val_results[..., -1].long()
             for n in range(all_slide_ns.max()):
                 slide_idxs = all_slide_ns == n
                 if self.val_subbatch_size > 10 or sum(slide_idxs) >= 10:
@@ -194,20 +194,26 @@ class Classifier(pl.LightningModule):
             
             for m, method in enumerate(methods):
                 all_slides_probs = all_slides_probs_by_method[m, ...]
-                pl_tpr = all_slides_probs[all_slides_targets == 1, 1].median()
-                pl_fpr = all_slides_probs[all_slides_targets == 0, 1].median()
+                pl_tps = all_slides_probs[all_slides_targets == 1, 1].median()
+                pl_fps = all_slides_probs[all_slides_targets == 0, 1].median()
+                pl_tpr = all_slides_probs[all_slides_targets == 1, 1].round().mean()
+                pl_fpr = all_slides_probs[all_slides_targets == 0, 1].round().mean()
                 
                 pl_auroc = auroc(all_slides_probs, all_slides_targets, num_classes=self.num_classes)
                 pl_acc = accuracy(all_slides_probs, all_slides_targets)
                 self.all_val_results = []
                 self.log('pl_valid_' + method + '/auroc', pl_auroc, prog_bar=False, sync_dist=True)
                 self.log('pl_valid_' + method + '/acc', pl_acc, prog_bar=False, sync_dist=True)
-                self.log('pl_valid_' + method + '/pos_score', pl_tpr, prog_bar=False, sync_dist=True)
-                self.log('pl_valid_' + method + '/f_pos_score', pl_fpr, prog_bar=False, sync_dist=True)
+                self.log('pl_valid_' + method + '/pos_score', pl_tps, prog_bar=False, sync_dist=True)
+                self.log('pl_valid_' + method + '/f_pos_score', pl_fps, prog_bar=False, sync_dist=True)
+                self.log('pl_valid_' + method + '/tpr', pl_tpr, prog_bar=False, sync_dist=True)
+                self.log('pl_valid_' + method + '/fpr', pl_fpr, prog_bar=False, sync_dist=True)
 
         tps = all_probs[all_targets == 1, 1].median()
         fps = all_probs[all_targets == 0, 1].median()
-
+        tpr = all_probs[all_targets == 1, 1].round().mean()
+        fpr = all_probs[all_targets == 0, 1].round().mean()
+        
         loss = self.classification_loss(torch.log(all_probs), all_targets) if self.subbatch_mean == 'probs' else \
                self.classification_loss(all_preds, all_targets)
         confmat = self.confusion.compute()
@@ -217,6 +223,8 @@ class Classifier(pl.LightningModule):
         self.log('valid/loss', loss, prog_bar=True, sync_dist=True)
         self.log('valid/pos_score', tps, prog_bar=True, sync_dist=True)
         self.log('valid/f_pos_score', fps, prog_bar=True, sync_dist=True)
+        self.log('valid/tpr', tpr, prog_bar=True, sync_dist=True)
+        self.log('valid/fpr', fpr, prog_bar=True, sync_dist=True)
         self.log('valid/acc', acc, prog_bar=True, sync_dist=True)
         self.log('valid/auc', auc, prog_bar=True, sync_dist=True)
         
