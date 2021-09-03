@@ -12,7 +12,7 @@ from ml4medical.utils import get_project_root
 
 if __name__ =="__main__":
     config_file_name = 'config_MSI1.json'
-    from_console = False
+    from_console = True
     args = None
     this_dir = get_project_root()
     #this_dir = "/home/nb671233/project-cholangiocarcinoma"
@@ -87,7 +87,8 @@ if __name__ =="__main__":
             val_batch_size=trainer_conf['val_batch_size'],
             subbatch_size=trainer_conf['subbatch_size'],
             val_subbatch_size=trainer_conf['val_subbatch_size'],
-            subbatch_mean=model_conf['subbatch_mean']
+            subbatch_mean=model_conf['subbatch_mean'],
+            augmentations=trainer_conf['augmentations']
     )
     
     accelerator = 'ddp' if distributed else None
@@ -105,6 +106,8 @@ if __name__ =="__main__":
                          fast_dev_run=False,
                          resume_from_checkpoint=checkpoint
                          )
-    copy_code_base(this_dir, trainer.logger.log_dir, config_file_name)
+    #if int(os.environ["LOCAL_RANK"]) == 0:
+    #    copy_code_base(this_dir, trainer.logger.log_dir, config_file_name)
+
 
     trainer.fit(model, data_module)

@@ -2,6 +2,10 @@ import argparse
 import numpy as np
 from PIL import Image
 
+#from joblib import Parallel, delayed
+import os
+import glob
+
 class NormalizeStaining(object):
     ''' Normalize staining appearence of H&E stained images
 
@@ -135,7 +139,7 @@ def normalizeStaining(img, saveFile=None, Io=240, alpha=1, beta=0.15):
     img = img.reshape((-1, 3))
 
     # calculate optical density
-    OD = -np.log((img.astype(np.float) + 1) / Io)
+    OD = -np.log((img.astype(float) + 1) / Io)
 
     # remove transparent pixels
     ODhat = OD[~np.any(OD < beta, axis=1)]
@@ -196,6 +200,23 @@ def normalizeStaining(img, saveFile=None, Io=240, alpha=1, beta=0.15):
 
     return Inorm, H, E
 
+#def check_file(file_path):
+#            img = np.array(Image.open(file_path))
+#            h,w,c = img.shape
+#            if not h ==  w:
+#                print("shapes differ:",file_path)
+#            try:
+#                normalizeStaining(img=img,
+#                          Io=args.Io,
+#                          alpha=args.alpha,
+#                          beta=args.beta)
+#            except:
+#                print("corrupted:", file_path)
+
+
+#def check_parallel(data_path, n_jobs=24):
+#        files = glob.iglob(data_path+"**/*.png",recursive=True)
+#        res = Parallel(n_jobs=n_jobs)(map(delayed(check_file), files))
 
 if __name__ == '__main__':
 
@@ -203,10 +224,7 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     from torch.utils.data import DataLoader
 
-
-    from torch.utils.data import DataLoader
-
-    test_transform = True
+    test_transform = False
 
 
     if test_transform == False:
@@ -218,24 +236,32 @@ if __name__ == '__main__':
         parser.add_argument('--beta', type=float, default=0.15)
         args = parser.parse_args()
 
-        img = np.array(Image.open(args.imageFile))
+        #img = np.array(Image.open(args.imageFile))
 
-        normalizeStaining(img=img,
-                          saveFile=args.saveFile,
-                          Io=args.Io,
-                          alpha=args.alpha,
-                          beta=args.beta)
+        rootdir = '/work/nb671233/data/CCC_01/CCC/train/'
+        #check_parallel(rootdir,n_jobs=24)
+
+        print("end")
+        #for fname in glob.iglob(rootdir+"**/*.png",recursive=True):
+        #    img = np.array(Image.open(fname))
+        #    try:
+        #        normalizeStaining(img=img,
+        #                  Io=args.Io,
+        #                  alpha=args.alpha,
+        #                  beta=args.beta)
+        #    except:
+        #        print("corrupted:", fname)
 
     else:
-        rootdir = '/home/phil/develop/python/project-cholangiocarcinoma/qupath/test/all_tiles'
-        custom_trafo = transforms.Compose([transforms.ToTensor()])
-        dataset = datasets.ImageFolder(root=rootdir,transform=custom_trafo)
-        train_dataloader = DataLoader(dataset, batch_size=64, shuffle=False)
-        batch,labels = next(iter(train_dataloader))
-        plt.subplot(1,2,1)
-        plt.imshow(batch[0].T)
+        rootdir = '/work/nb671233/data/CCC_01/CCC/train/'
+        #custom_trafo = transforms.Compose([transforms.ToTensor()])
+        #dataset = datasets.ImageFolder(root=rootdir,transform=custom_trafo)
+        #train_dataloader = DataLoader(dataset, batch_size=64, shuffle=False)
+        #batch,labels = next(iter(train_dataloader))
+        #plt.subplot(1,2,1)
+        #plt.imshow(batch[0].T)
 
-        custom_trafo = transforms.Compose([NormalizeStaining(), transforms.ToTensor()])
+        custom_trafo = transforms.Compose([transforms.Resize(256), NormalizeStaining(), transforms.ToTensor()])
         dataset = datasets.ImageFolder(root=rootdir, transform=custom_trafo)
         train_dataloader = DataLoader(dataset, batch_size=64, shuffle=False)
         batch, labels = next(iter(train_dataloader))
