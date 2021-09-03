@@ -187,7 +187,7 @@ class Classifier(pl.LightningModule):
                 if sum(slide_idxs) > 0 and (self.val_subbatch_size > 10 or sum(slide_idxs) >= 10):
                     for m, method in enumerate(methods):
                         all_slides_probs_by_method[m].append(self.get_accumulated_prediction(all_preds[slide_idxs], method=method,
-                            make_prob=self.subbatch_mean != 'probs' or not self.val_subbatch_size))
+                            accum_dim=0, make_prob=self.subbatch_mean != 'probs' or not self.val_subbatch_size))
                     all_slides_targets.append(all_targets[slide_idxs][0])
             all_slides_probs_by_method = torch.stack([torch.stack(preds, 0) for preds in all_slides_probs_by_method], dim=0)
             all_slides_targets = torch.stack(all_slides_targets, dim=0)

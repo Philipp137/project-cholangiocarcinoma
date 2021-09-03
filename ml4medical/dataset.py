@@ -32,10 +32,11 @@ def tile_position_CCC(tile_path):
     
 class TileImageDataset(datasets.ImageFolder):
     def __init__(self, root_folder, mode, normalize=True, data_variant='CCC', get_parent_slide=None, get_tile_position=None,
-                 resolution=None, return_slide_number=False):
+                 resolution=None, return_slide_number=False, augmentations='light'):
         #TODO: Move Transforms out?
-        resulution = resolution or 256 if data_variant == 'CCC' else 224
+        resulution = resolution or 224
         self.return_slide_number = return_slide_number
+        self.augmentations = augmentations
         transforms_list = []
         if normalize:
             transforms_list.append(ml4medical.NormalizeStaining())
@@ -45,18 +46,24 @@ class TileImageDataset(datasets.ImageFolder):
             self.resize = transforms.Resize(resulution)
             transforms_list.append(self.resize)
         if mode == 'train':
-            transforms_list.extend([
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomVerticalFlip(),
-                # transforms.ColorJitter(brightness=0.02, contrast=0.02, saturation=0.02, hue=0.02),
-                # transforms.RandomAffine(degrees=180, shear=5, fill=0),
-                # transforms.RandomResizedCrop(resulution, scale=[0.6, 1], ratio=(3. / 4., 4. / 3.)),
-                # transforms.RandomAdjustSharpness(sharpness_factor=3, p=0.5),
-                # transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.01, 2)),
-                # transforms.RandomAutocontrast(p=0.1),
-    
-                transforms.RandomAffine(degrees=0, translate=[5/256, 5/256], fill=0),
-            ])
+            if augmentations == 'light':
+                transforms_list.extend([
+                    transforms.RandomHorizontalFlip(),
+                    transforms.RandomVerticalFlip(),
+                    transforms.RandomAffine(degrees=0, translate=[5/256, 5/256], fill=0),
+                ])
+            elif augmentations == 'heavy':
+                transforms_list.extend([
+                    transforms.RandomHorizontalFlip(),
+                    transforms.RandomVerticalFlip(),
+                    transforms.ColorJitter(brightness=0.02, contrast=0.02, saturation=0.02, hue=0.02),
+                    transforms.RandomAffine(degrees=180, shear=5, translate=[0.03, 0.03], fill=0),
+                    transforms.RandomResizedCrop(resulution, scale=[0.6, 1], ratio=(3. / 4., 4. / 3.)),
+                    transforms.RandomAdjustSharpness(sharpness_factor=3, p=0.5),
+                    transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.01, 2)),
+                    transforms.RandomAutocontrast(p=0.1),
+                ])
+                
 
         #transforms_list.append()
             
@@ -115,8 +122,8 @@ class TileImageDataset(datasets.ImageFolder):
                 self.slide_n_per_idx.append(slide_n)
                 self.slide_name_per_idx.append(slide)
             slide_n += 1
-        self.slide_n_per_idx = [x for _, x in sorted(zip(unsorted_idx, self.slide_n_per_idx))]
-        self.slide_name_per_idx = [x for _, x in sorted(zip(unsorted_idx, self.slide_name_per_idx))]
+        self.slide_n_per_idx = [x for _, x in sorted(zip(unsorted_idx, self.slide_n_per_idx.copy()))]
+        self.slide_name_per_idx = [x for _, x in sorted(zip(unsorted_idx, self.slide_name_per_idx.copy()))]
         
         #self.tile_position = np.array(self.tile_position) if self.tile_position else self.tile_position
         
@@ -174,7 +181,7 @@ class TileImageDataset(datasets.ImageFolder):
         
 class TileSubBatchSampler(torch.utils.data.Sampler):
     def __init__(self, tile_image_dataset, subbatch_size, mode='class', shuffle=True, shuffle_subs=None, distributed=False,
-                 balance='oversample'):
+                 balance='undersample'):
         self.subbatch_size = subbatch_size if subbatch_size > 0 else 1
         self.no_subbatches = subbatch_size == 0
         self.ds = tile_image_dataset
@@ -289,6 +296,7 @@ class DataModule(pl.LightningDataModule):
         def __init__(self,
                      root_folder,
                      data_variant,
+                     augmentations,
                      train_batch_size,
                      val_batch_size,
                      train_subbatch_size,
@@ -307,7 +315,7 @@ class DataModule(pl.LightningDataModule):
             super(DataModule, self).__init__()
             normalize = normalize if normalize is not None else data_variant != 'MSIMSS'
             self.train_dataset = TileImageDataset(root_folder=root_folder, mode='train', data_variant=data_variant, normalize=normalize,
-                                                  return_slide_number=train_return_slide_number)
+                                                  return_slide_number=train_return_slide_number, augmentations=augmentations)
             self.val_dataset = TileImageDataset(root_folder=root_folder, mode='val', data_variant=data_variant, normalize=normalize,
                                                 return_slide_number=val_return_slide_number)
             self.train_batch_size = train_batch_size

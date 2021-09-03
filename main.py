@@ -57,11 +57,14 @@ if __name__ =="__main__":
     data_module = DataModule(
             root_folder=data_folder,
             data_variant=data_variant,
+            augmentations = trainer_conf['augmentations'],
             train_batch_size=trainer_conf['batch_size'],
             val_batch_size=trainer_conf['val_batch_size'],
             train_subbatch_size=trainer_conf['subbatch_size'],
             val_subbatch_size=trainer_conf['val_subbatch_size'],
             val_return_slide_number=True,
+            train_balance=trainer_conf['balance'],
+            val_balance=trainer_conf['balance'],
             distributed=distributed,
             num_workers=num_workers,
             persistent_workers=True
