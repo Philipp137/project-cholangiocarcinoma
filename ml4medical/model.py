@@ -9,7 +9,7 @@ import pytorch_lightning as pl
 class Classifier(pl.LightningModule):
     def __init__(self, classifier_net, num_classes=2, relevance_class=False, optimizer={'AdamW': {'lr': 1e-5}},
                  patient_level_vali=True, learn_dec_bound=False, batch_size=0, subbatch_size=0, val_batch_size=0, val_subbatch_size=0,
-                 subbatch_mean='logits'):
+                 subbatch_mean='logits', augmentations='light'):
         super(Classifier, self).__init__()
         self.save_hyperparameters()
         self.classifier_net = classifier_net
@@ -26,6 +26,7 @@ class Classifier(pl.LightningModule):
         self.val_batch_size = val_batch_size
         self.val_subbatch_size = val_subbatch_size
         self.subbatch_mean = subbatch_mean if subbatch_size else None
+        self.augmentations = augmentations
         self.prob_activation = torch.nn.Sigmoid() if num_classes == 1 else torch.nn.Softmax(dim=-1)
         if not self.subbatch_mean or self.subbatch_mean == 'logits':
             self.classification_loss = torch.nn.BCEWithLogitsLoss() if num_classes == 1 else torch.nn.CrossEntropyLoss()
