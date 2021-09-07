@@ -79,7 +79,8 @@ class TileImageDataset(datasets.ImageFolder):
                 self.inverse_targets = self.class_to_idx['MSIMUT'] != 1 # This is necessary for ROC_AUC metric to work properly
         else:
             self.get_parent_slide = get_parent_slide
-            
+
+        self.get_tile_position = get_tile_position
         if get_tile_position is None:
             if data_variant == 'CCC':
                 self.get_tile_position = tile_position_CCC
@@ -88,7 +89,6 @@ class TileImageDataset(datasets.ImageFolder):
         else:
             self.get_tile_position = get_tile_position
             
-        self.get_tile_position = get_tile_position
         self.parent_slide = dict()
         self.parent_slide_per_class = {n: dict() for n in range(len(self.classes))}
         self.parent_slide_name = list()
@@ -174,7 +174,7 @@ class TileImageDataset(datasets.ImageFolder):
         
         if self.tile_position:
             pos = [self.tile_position[idx] for idx in slide_tile_idxs]
-            return samples, targets, pos
+            return samples, targets, torch.tensor(pos)
         
         return samples, targets
         

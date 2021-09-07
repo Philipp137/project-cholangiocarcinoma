@@ -7,6 +7,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
+import os
+import re
+import glob
 from torchvision.utils import make_grid
 from torchvision import transforms
 
@@ -20,6 +23,23 @@ def imshow4normalized(inp, title=None, mean = np.array([0.485, 0.456, 0.406]), s
     if title is not None:
         plt.title(title)
     plt.pause(0.001)  # pause a bit so that plots are updated
+
+def show_heatmap(xlist,ylist,predictions):
+    """
+    ** show_heatmap **
+    :param xlist: xlist[i] is the x_i coordinate of the tile_i
+    :param ylist: ylist[i] is the y_i coordinate of the tile_i
+    :param predictions: predictions[i] is the prediction of the tile_i
+    :return: figure handle
+    """
+    map = np.NaN * np.zeros([max(xlist) + 1, max(ylist) + 1])
+    map[xlist, ylist] = predictions
+    h = plt.imshow(map.T)
+    plt.xticks([])
+    plt.yticks([])
+    return h
+
+
 
 
 def show_datasamples(data_module, samples_per_class, samples_per_row):
@@ -58,3 +78,24 @@ def show_transforms(data_module, samples_per_class, samples_per_row, variant='CC
     all_samples = make_grid(torch.stack([train_c0_samples, train_c1_samples, train_c0_samples_orig, train_c1_samples_orig]), 2)
     plt.figure()
     plt.imshow(all_samples.permute([1, 2, 0]))
+    
+    
+if __name__ =="__main__":
+    project_directory = '/run/media/phil/Elements/data/CCC//14-51098/'
+    tile_list = sorted(glob.glob(project_directory+'**/*.png', recursive=True))
+
+    xlist , ylist, tile_num_list = [], [], []
+    for tile_path in tile_list:
+        file = os.path.basename(tile_path)
+        m = re.match("(\d{2})-(\d+)_(\d+)_(\d+)_(\d+).[png]*",file)
+        year = int(m.group(1))
+        id = int(m.group(2))
+        tile_number = int(m.group(3))
+        x = int(m.group(4))
+        y = int(m.group(5))
+        print(f'tile: {file} year: 20{year} id: {id} (x,y) = {x,y}' )
+        xlist.append(x)
+        ylist.append(y)
+        tile_num_list.append(tile_number)
+
+    show_heatmap(xlist,ylist,predictions = tile_num_list)
