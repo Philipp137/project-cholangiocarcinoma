@@ -1,4 +1,5 @@
 from ml4medical.dataset import TileImageDataset
+import matplotlib.pyplot as plt
 from ml4medical.visualize import show_heatmap
 from ml4medical.utils import get_checkpoint_path
 from ml4medical.net import ResNet
@@ -43,17 +44,19 @@ model = Classifier(classifier_net, num_classes=model_conf['num_classes'], releva
 
 checkpoint = get_checkpoint_path(resume) or None
 
-model.load_from_checkpoint(checkpoint)
+model.load_from_checkpoint(checkpoint).eval()
 
 
 val_dataset = TileImageDataset(data_folder, 'val', normalize=True, data_variant=trainer_conf['data_variant'], return_slide_number=True)
-slide_number = 1
-all_tiles, all_targetsNslide_ns, all_pos = val_dataset.get_tiles_from_slide(slide_number)
-target = all_targetsNslide_ns[0, 0]
-slide_n = all_targetsNslide_ns[0, 1]
 
-with torch.no_grad():
-    all_preds = model(all_tiles)
+for slide_number in range(30):
+    all_tiles, all_targetsNslide_ns, all_pos = val_dataset.get_tiles_from_slide(slide_number)
+    target = all_targetsNslide_ns[0, 0]
+    slide_n = all_targetsNslide_ns[0, 1]
 
-show_heatmap(all_pos[:, 0], all_pos[:, 1], all_preds[:, 1])
+    with torch.no_grad():
+        all_preds = model(all_tiles)
 
+    show_heatmap(all_pos[:, 0], all_pos[:, 1], all_preds[:, 1])
+    plt.savefig(str(val_dataset.parent_slide_name[slide_number])+"-heat.png")
+    plt.close("all")
