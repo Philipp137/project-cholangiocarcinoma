@@ -34,7 +34,10 @@ def show_heatmap(xlist,ylist,predictions):
     """
     map = np.NaN * np.zeros([max(xlist) + 1, max(ylist) + 1])
     map[xlist, ylist] = predictions
-    h = plt.imshow(map.T)
+    plt.figure()
+    cmap = plt.get_cmap("seismic")
+    cmap
+    h = plt.imshow(map.T, cmap=plt.get_cmap("seismic"), vmin=0, vmax=1)
     plt.xticks([])
     plt.yticks([])
     return h
