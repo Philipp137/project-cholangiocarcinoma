@@ -38,13 +38,19 @@ class TileImageDataset(datasets.ImageFolder):
         self.return_slide_number = return_slide_number
         self.augmentations = augmentations
         transforms_list = []
+        default_transforms_list = []
         if normalize:
             transforms_list.append(ml4medical.NormalizeStaining())
-        transforms_list.append(transforms.ToTensor())
+            default_transforms_list.append(ml4medical.NormalizeStaining())
+        if augmentations != 'auto' or mode != 'train':
+            transforms_list.append(transforms.ToTensor())
+        default_transforms_list.append(transforms.ToTensor())
         self.resize = None
         if data_variant == 'CCC':
             self.resize = transforms.Resize(resulution)
             transforms_list.append(self.resize)
+            default_transforms_list.append(self.resize)
+        self.default_transforms = transforms.Compose(default_transforms_list)
         if mode == 'train':
             if augmentations == 'light':
                 transforms_list.extend([
@@ -63,13 +69,15 @@ class TileImageDataset(datasets.ImageFolder):
                     transforms.GaussianBlur(kernel_size=(5, 5), sigma=(0.01, 2)),
                     transforms.RandomAutocontrast(p=0.1),
                 ])
+            elif augmentations == 'auto':
+                transforms_list.extend([transforms.AutoAugment(fill=0), transforms.ToTensor()])
                 
 
         #transforms_list.append()
-            
         image_transforms = transforms.Compose(transforms_list)
         super(TileImageDataset, self).__init__(root=os.path.join(root_folder, mode), transform=image_transforms, is_valid_file=is_valid_file)
         self.apply_transforms = True
+        self.apply_default_transforms = False
         if get_parent_slide is None:
             if data_variant == 'CCC':
                 self.get_parent_slide = parent_slide_name_CCC
@@ -139,6 +147,9 @@ class TileImageDataset(datasets.ImageFolder):
             sample = self.loader(path)
             if self.transform is not None and self.apply_transforms:
                 sample = self.transform(sample)
+
+            elif self.default_transforms is not None and self.apply_default_transforms:
+                sample = self.default_transforms(sample)
             else:
                 sample = transforms.ToTensor()(sample)
                 if self.resize:

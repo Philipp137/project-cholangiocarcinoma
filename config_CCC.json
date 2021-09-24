@@ -2,14 +2,14 @@
   "trainer":
   {
     "cluster": "steffen",
-    "data_variant": "MSIMSS",
+    "data_variant": "CCC",
     "random_seed": 42,
     "augmentations": "heavy",
     "balance": "undersample",
     "epoches": 200,
-    "batch_size": 128,
+    "batch_size": 256,
     "subbatch_size": 0,
-    "val_batch_size": 128,
+    "val_batch_size": 256,
     "val_subbatch_size": 0,
     "precision": 16,
     "num_workers": 12,
@@ -19,7 +19,7 @@
   "model":
   {
     "net_type": "Timm",
-    "variant": "vit_small_patch16_224",
+    "variant": "resnet18",
     "pretrained": true,
     "num_classes": 2,
     "relevance_class": false,
@@ -35,7 +35,7 @@
   },
   "data_folder":
   {
-    "MSIMSS": "CRC_KR/",
+    "MSIMSS": "CRC_KR_kather_split/",
     "CCC": "CCC/"
   }
 }
