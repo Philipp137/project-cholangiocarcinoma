@@ -1,0 +1,39 @@
+{
+  "trainer":
+  {
+    "cluster": "aachen",
+    "data_variant": "CCC",
+    "random_seed": 42,
+    "augmentations": "heavy",
+    "balance": "undersample",
+    "epoches": 100,
+    "batch_size": 8,
+    "subbatch_size": 32,
+    "val_batch_size": 8,
+    "val_subbatch_size": 32,
+    "precision": 16,
+    "num_workers": 12,
+    "num_nodes": 1,
+    "resume":""
+  },
+  "model":
+  {
+    "resnet_variant": "resnet18",
+    "pretrained": true,
+    "num_classes": 2,
+    "relevance_class": false,
+    "freeze_until": -6,
+    "subbatch_mean": "logits",
+    "optimizer": {"Adam": {"lr": [1e-6,2e-6],"weight_decay":1e-4}}
+  },
+  "data_root_paths":
+  {
+    "aachen": "/work/nb671233/data/",
+    "steffen": "D:/Arbeit/cholangiocarcinoma-data/"
+  },
+  "data_folder":
+  {
+    "MSIMSS": "CRC_KR/",
+    "CCC": "CCC_01/CCC/"
+  }
+}

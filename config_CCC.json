@@ -1,7 +1,7 @@
 {
   "trainer":
   {
-    "cluster": "steffen",
+    "cluster": "aachen",
     "data_variant": "CCC",
     "random_seed": 42,
     "augmentations": "heavy",
@@ -19,11 +19,11 @@
   "model":
   {
     "net_type": "Timm",
-    "variant": "resnet18",
+    "variant": "vit_small_patch16_224",
     "pretrained": true,
     "num_classes": 2,
     "relevance_class": false,
-    "freeze_until": -6,
+    "freeze_until": -11,
     "subbatch_mean": "probs",
     "optimizer": {"Adam": {"lr": [1e-6, 2e-6], "weight_decay": 1e-4}}
   },

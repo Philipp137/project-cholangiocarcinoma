@@ -12,7 +12,7 @@ from ml4medical.utils import get_project_root
 
 if __name__ =="__main__":
     config_file_name = 'config_MSI1.json'
-    from_shell = False
+    from_shell = True
     args = None
     this_dir = get_project_root()
     #this_dir = "/home/nb671233/project-cholangiocarcinoma"

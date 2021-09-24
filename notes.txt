@@ -1,0 +1,5 @@
+version_22916845: batch_size = 32, subbatch_size=24, KR_kather_split
+version_22916899: batch_size = 768, subbatch_size=0, KR_kather_split
+version_22918423: batch_size = 384, subbatch_size=0, KR_kather_split
+version_22920998: batch_size = 15, subbatch_size=24, val_subbatch_size=24, KR_kather_split
+version_22923125: batch_size = 15, subbatch_size=24, KR_kather_split
