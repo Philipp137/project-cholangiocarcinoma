@@ -18,7 +18,8 @@
   },
   "model":
   {
-    "resnet_variant": "resnet18",
+    "net_type": "Timm",
+    "variant": "vit_small_patch16_224",
     "pretrained": true,
     "num_classes": 2,
     "relevance_class": false,

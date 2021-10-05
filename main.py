@@ -1,4 +1,4 @@
-from ml4medical.net import ResNet
+from ml4medical import net
 from ml4medical.model import Classifier
 from ml4medical.dataset import DataModule
 from ml4medical.utils import copy_code_base, get_checkpoint_path
@@ -12,11 +12,11 @@ from ml4medical.utils import get_project_root
 
 if __name__ =="__main__":
     config_file_name = 'config_MSI1.json'
-    from_console = True
+    from_shell = True
     args = None
     this_dir = get_project_root()
     #this_dir = "/home/nb671233/project-cholangiocarcinoma"
-    if from_console:
+    if from_shell:
         parser = argparse.ArgumentParser()
         parser.add_argument('-w', '--num_workers', type=int, help='Number of workers for the DataLoader to use', default=None)
         parser.add_argument('-n', '--num_nodes', type=int, help='Number of nodes to use on the cluster', default=None)
@@ -71,8 +71,9 @@ if __name__ =="__main__":
     )
     
     model_conf = config['model']
-    classifier_net = ResNet(variant=model_conf['resnet_variant'], num_classes=model_conf['num_classes'] + model_conf['relevance_class'],
-                            pretrained=model_conf['pretrained'])
+    classifier_net = getattr(net, model_conf['net_type'])(variant=model_conf['variant'],
+                                                          num_classes=model_conf['num_classes'] + model_conf['relevance_class'],
+                                                          pretrained=model_conf['pretrained'])
                    
     if 'freeze_until' in config['model'] and config['model']['freeze_until']:
         classifier_net.freeze_until_nth_layer(config['model']['freeze_until'])
@@ -88,7 +89,7 @@ if __name__ =="__main__":
             subbatch_size=trainer_conf['subbatch_size'],
             val_subbatch_size=trainer_conf['val_subbatch_size'],
             subbatch_mean=model_conf['subbatch_mean'],
-            augmentations=trainer_conf['augmentations']
+            augmentations=trainer_conf['augmentations'],
     )
     
     accelerator = 'ddp' if distributed else None
