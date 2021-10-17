@@ -18,22 +18,22 @@ def show_heatmap(xlist,ylist,predictions):
     h = plt.imshow(map.T)
     plt.xticks([])
     plt.yticks([])
-    return h
+    return
 
 
 if __name__ =="__main__":
-    project_directory = '/run/media/phil/Elements/data/CCC//14-51098/'
+    project_directory = '/run/media/phil/Elements/mainz/tiles/05-26809-5.5/'
     tile_list = sorted(glob.glob(project_directory+'**/*.png', recursive=True))
 
     xlist , ylist, tile_num_list = [], [], []
     for tile_path in tile_list:
         file = os.path.basename(tile_path)
-        m = re.match("(\d{2})-(\d+)_(\d+)_(\d+)_(\d+).[png]*",file)
+        m = re.match("(\d{2})-(\d+)-(\S+)_(\d+)_(\d+)_(\d+).[png]*",file)
         year = int(m.group(1))
         id = int(m.group(2))
-        tile_number = int(m.group(3))
-        x = int(m.group(4))
-        y = int(m.group(5))
+        tile_number = int(m.group(4))
+        x = int(m.group(5))
+        y = int(m.group(6))
         print(f'tile: {file} year: 20{year} id: {id} (x,y) = {x,y}' )
         xlist.append(x)
         ylist.append(y)

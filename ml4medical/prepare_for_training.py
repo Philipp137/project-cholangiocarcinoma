@@ -10,41 +10,101 @@ This script has the following purpose:
 '''
 
 import glob
-import os
+import os,re
 import pandas as pd
 import numpy as np
 import pathlib
 from qupath_utils import create_qupath_project_file, create_qupath_classes_file
+from normalize import normalizeStaining
+from PIL import Image
+from shutil import copyfile
+from joblib import Parallel, delayed
+
+
+
+def reformat_name(scan_name):
+    try:
+        id , year, version = scan_name.split('_')
+        return year + '-' + id + '-' + version
+    except:
+        id, year= scan_name.split('_')
+        return year + '-' + id
+
+
+def is_file_ok(file_path, white_pixel_fraction = 0.6):
+            img = np.array(Image.open(file_path))
+
+            # check sqaurness:
+            h,w,c = img.shape
+            if not h  ==  w:
+                print("shapes differ:",file_path.split("/")[-1])
+                return False
+            # check if to white
+            number_white_pixels = np.sum(np.mean(img,axis=2)>220)
+            number_pixels = h*w
+            if number_white_pixels/number_pixels > white_pixel_fraction:
+                print("too white:", file_path.split("/")[-1])
+                return False
+            # check if normalization works
+            try:
+                normalizeStaining(img=img,
+                          Io=240,
+                          alpha=1,
+                          beta=0.15)
+            except:
+                print("normalization error:", file_path.split("/")[-1])
+                return False
+
+
+            return True
+
+
+def check_file(subdir,file):
+    file_path = os.path.join(subdir, file)
+    if is_file_ok(file_path):
+        # now calculate smallest x,y coordinate
+        #  - filename is like: '10049_13_1.4 - 2021-04-14 17.51.37 [x=12361,y=33713,w=1124,h=1124].png'
+        #  - re.findall(r'(\w+)=(\d+)', file) is a regexp to find the values and keys seperated by =
+        #  - dict converts the return to a dictionary
+        #  - and map(int, list) converts all elements in list to integer
+        xpos, ypos, w, h = map(int, dict(re.findall(r'(\w+)=(\d+)', file)).values())
+
+
+        return file, int(xpos),int(ypos),int(w),int(h)
+
+
+
+def check_parallel(files,subdir, n_jobs=4):
+    is_ok = lambda file: check_file(subdir, file)
+    checked_list = Parallel(n_jobs=n_jobs)(map(delayed(is_ok), files))
+
+
+    clean_list = list(filter(None.__ne__, checked_list)) # this filters all the none elements
+    clean_list = np.asarray(clean_list)
+    clean_files = list(np.asarray(list(filter(None.__ne__, clean_list)))[:,0])
+    xmin = min(np.asarray(list(np.asarray(list(filter(None.__ne__, clean_list)))[:, 1]),dtype=np.int))
+    ymin = min(np.asarray(list(np.asarray(list(filter(None.__ne__, clean_list)))[:, 2]),dtype=np.int))
+    w = np.asarray(list(filter(None.__ne__, clean_list)))[:, 3]
+    assert( np.all(w==w[0]) ), "all tiles must have same size/width!!!"
+    return clean_files, xmin, ymin, int(w[0])
+
+
+
 
 ## Define the folders and files
-IO_paths = {"source": '/run/media/phil/Elements/iCCA/',          # raw images, i.e. *tiff files
+cohort = "mainz"
+if cohort=="aachen":
+    IO_paths = {"source": '/run/media/phil/Elements/iCCA/',          # raw images, i.e. *tiff files
            "annotations": '/run/media/phil/Elements/qupath/',   # folder with annotations of pathologist
            "labels": '/run/media/phil/Elements/CCC-labels.csv', # csv data with id of the tiff image and label (pos, neg)
            "work" : '/run/media/phil/Elements/work_qupath/',           # work folder for intermediate results and files
            "ML-data":   '/run/media/phil/Elements/data/',}       # data for neuronal network to train and test
+elif cohort == "mainz":
+    IO_paths = {"tiles_raw": '/run/media/phil/Elements/mainz/tiles_raw/', # tiles after running qupath script on project.qproj
+                "tiles_clean": '/run/media/phil/Elements/mainz/tiles_clean/',  # tile directory after cleaning 
+                "tiles_dirty": '/run/media/phil/Elements/mainz/tiles_dirty/'}  # tile directory after cleaning 
 
-##
-fraction_train = 0.8
-
-## choose a method to export tiles
-    # method = 'pyhist' uses pyhist for image segementation and exporting tiles without human help (pathologist)
-    # method = 'qupath' exports tiles from pathologist defined areas
-method = "qupath"
-
-if method == "pyhist":
-    ## loop over all scans in the source folder
-    i = 0
-    for filename in glob.glob(IO_paths["source"]+'**/*.tif', recursive=True):
-        i = i + 1
-        # mask the images and export tiles
-        command = 'python PyHIST/pyhist.py --save-patches --save-tilecrossed-image --borders 0000 --corners 1010 --percentage-bc 1 ' + \
-                  '--content-threshold 0.4 --patch-size 512 --output-downsample 4 --k-const 1000 --minimum_segmentsize 1000 --method="adaptive" ' + \
-                  '--output %s %s'%(IO_paths['work'], filename)
-        success = os.system(command)
-        if success !=0: print("Segmentation of %s did not work! Stopping script" % filename); break
-
-elif method == "qupath":
-    i = 0
+if cohort == "aachen":
     for filename in sorted(glob.glob(IO_paths["source"]+'**/*.tif', recursive=True)):
         i = i + 1
         # %-----------------------------------------------------------
@@ -75,33 +135,43 @@ elif method == "qupath":
         success = os.system(command)
 
     # 4. run groovy script to export tiles from the annotations
+elif cohort == "mainz":
+        print("mainz")
+        nscans = 0
+        for subdir, dirs, files in os.walk(IO_paths["tiles_raw"]):
 
-assert ( False)
+            if len(files)>0: # check if dir is empty
+                nscans = nscans + 1
+                #if nscans <= 51:
+                #    continue
+                scan_name = subdir.split("/")[-1]
+                scan_name = reformat_name(scan_name)
+                print("#####################################")
+                print("%d scan: "%(nscans), scan_name)
+                print("#####################################")
 
-df = pd.read_csv(IO_paths["labels"])
-test = {"pos": IO_paths["ML-data"] + "/test/pos/", "neg": IO_paths["ML-data"] + "/test/neg/"}
-train = {"pos": IO_paths["ML-data"] + "/train/pos/", "neg": IO_paths["ML-data"] + "/train/neg/"}
+                newdir = os.path.join(IO_paths["tiles_clean"],scan_name)
+                pathlib.Path(newdir).mkdir(parents=True, exist_ok=True)
 
-for f in list(test.values())+list(train.values()):
-    if not os.path.exists(f):
-        os.makedirs(f)
-    else:
-        assert(len(os.listdir(f))==0) , "Directory %s is not empty! Please remove files!" % f
+                clean_files, xmin, ymin, width = check_parallel(files,subdir)
 
-#os.mkdir()
+                print("number raw tiles:", len(files))
+                print("number clean tiles:", len(clean_files))
+                for i, file in enumerate(clean_files):
+                    xpos, ypos, width, h = map(int, dict(re.findall(r'(\w+)=(\d+)', file)).values())
+                    x_rel = int((xpos-xmin)/width)
+                    y_rel = int((ypos-ymin)/width)
+                    new_file = scan_name +'_'+str(i)+'_'+str(x_rel)+'_'+str(y_rel)+'.png'
+                    new_path = os.path.join(newdir,new_file)
+                    file_path = os.path.join(subdir, file)
+                    copyfile(file_path , new_path)
 
-for folder in glob.glob(IO_paths['work']+'*'):
-    folder_name = folder.split('/')[-1]  #assuming that folder_name is the same as the id of the patient
-    label = df.label[df.scan==folder_name].item()
-    if label == "missing":    continue
-    print("\n\nscan: %s    label: %s" %(folder_name, label))
-    print("Copy tiles to: ")
-    for tile in glob.glob(folder+"/"+folder_name+"_tiles/*.png"):
-        if np.random.random() < fraction_train:
-            print("Tile: %s -> %s" %(tile.split("/")[-1], train[label]))
-            command = "cp "+ tile + ' ' + train[label]
-        else:
-            print("Tile: %s -> %s"%(tile.split("/")[-1], test[label]))
-            command = "cp "+ tile + ' ' + test[label]
+                dirty_files = list(set(files)-set(clean_files))
+                newdir = os.path.join(IO_paths["tiles_dirty"],scan_name)
+                pathlib.Path(newdir).mkdir(parents=True, exist_ok=True)
+                for i,file in enumerate(dirty_files):
+                    file_path = os.path.join(subdir, file)
+                    new_path = os.path.join(newdir, file)
+                    copyfile(file_path , new_path)
 
-        os.system(command)
+
