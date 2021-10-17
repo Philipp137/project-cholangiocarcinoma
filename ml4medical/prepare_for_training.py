@@ -1,4 +1,5 @@
 '''
+[Aachen]
 This script has the following purpose:
 1. take the images from the source_path and generate tiles from it using PyHIST (https://pyhist.readthedocs.io/en)
     or from the annotations in qupath
@@ -6,19 +7,20 @@ This script has the following purpose:
         prefix: data/
         train/pos/ and train/neg/
         test/pos/ and test/neg
-
+[MAINZ]
+This script cleans the csv file and removes empty dirs in tile directory
 '''
 
 import glob
 import os,re
-import pandas as pd
 import numpy as np
+import pandas
 import pathlib
 from qupath_utils import create_qupath_project_file, create_qupath_classes_file
 from normalize import normalizeStaining
 from PIL import Image
-from shutil import copyfile
 from joblib import Parallel, delayed
+
 
 
 
@@ -94,15 +96,15 @@ def check_parallel(files,subdir, n_jobs=4):
 ## Define the folders and files
 cohort = "mainz"
 if cohort=="aachen":
-    IO_paths = {"source": '/run/media/phil/Elements/iCCA/',          # raw images, i.e. *tiff files
-           "annotations": '/run/media/phil/Elements/qupath/',   # folder with annotations of pathologist
-           "labels": '/run/media/phil/Elements/CCC-labels.csv', # csv data with id of the tiff image and label (pos, neg)
-           "work" : '/run/media/phil/Elements/work_qupath/',           # work folder for intermediate results and files
-           "ML-data":   '/run/media/phil/Elements/data/',}       # data for neuronal network to train and test
+    IO_paths = {"source": '/run/media/pkrah/Elements/iCCA/',          # raw images, i.e. *tiff files
+           "annotations": '/run/media/pkrah/Elements/qupath/',   # folder with annotations of pathologist
+           "labels": '/run/media/pkrah/Elements/CCC-labels.csv', # csv data with id of the tiff image and label (pos, neg)
+           "work" : '/run/media/pkrah/Elements/work_qupath/',           # work folder for intermediate results and files
+           "ML-data":   '/run/media/pkrah/Elements/data/',}       # data for neuronal network to train and test
 elif cohort == "mainz":
-    IO_paths = {"tiles_raw": '/run/media/phil/Elements/mainz/tiles_raw/', # tiles after running qupath script on project.qproj
-                "tiles_clean": '/run/media/phil/Elements/mainz/tiles_clean/',  # tile directory after cleaning 
-                "tiles_dirty": '/run/media/phil/Elements/mainz/tiles_dirty/'}  # tile directory after cleaning 
+    IO_paths = {"tiles": '/run/media/pkrah/Elements/mainz/tiles/',
+                "csv_file": '/run/media/pkrah/Elements/mainz/mainz.csv', # this is the raw data csv file
+                "csv_labels": '/run/media/pkrah/Elements/mainz/mainz_labels.csv'} # this is the cleaned csv_file
 
 if cohort == "aachen":
     for filename in sorted(glob.glob(IO_paths["source"]+'**/*.tif', recursive=True)):
@@ -136,42 +138,66 @@ if cohort == "aachen":
 
     # 4. run groovy script to export tiles from the annotations
 elif cohort == "mainz":
-        print("mainz")
-        nscans = 0
-        for subdir, dirs, files in os.walk(IO_paths["tiles_raw"]):
 
-            if len(files)>0: # check if dir is empty
-                nscans = nscans + 1
-                #if nscans <= 51:
-                #    continue
-                scan_name = subdir.split("/")[-1]
-                scan_name = reformat_name(scan_name)
-                print("#####################################")
-                print("%d scan: "%(nscans), scan_name)
-                print("#####################################")
+        csv_file = IO_paths["csv_file"]
+        fields = ['Blocknummer', 'N']
+        newname = ['scan', 'label']
+        df = pandas.read_csv(csv_file, skipinitialspace=True, usecols=fields, sep=";")
+        df = df.rename(columns=dict(zip(fields, newname)))
+        Nscans = df.size
+        print(f" + Reading: {csv_file} with {Nscans} scans" )
+        # drop all scans with empty label
+        df = df.dropna(subset = ["label"])
+        print(f" + Dropping {Nscans-df.size} scans because of missing label" )
+        Nscans = df.size
 
-                newdir = os.path.join(IO_paths["tiles_clean"],scan_name)
-                pathlib.Path(newdir).mkdir(parents=True, exist_ok=True)
+        assert(os.path.exists(IO_paths["tiles"])), "Path does not exist: "+ IO_paths["tiles"]
+        # remove empty folders
+        root = IO_paths["tiles"]
+        folders = list(os.walk(root))[1:]
+        for folder in folders:
+            # folder example: ('FOLDER/3', [], ['file'])
+            if not folder[2]:
+                os.rmdir(folder[0])
+        trash_list = []
+        scan_list = []
+        label_list = []
+        # loop through all rows in the dataframe:
+        #   + reformate scan name in the year-pathologynr-version style
+        #   + find the directory of the scan where the tiles are saved
+        #   + reformate label
+        for index, row in df.iterrows():
+            scan0 = row["scan"]
+            label = row["label"]
+            # clean scan name:
+            exp=re.match("(\d{2})[.|-](\d+)[\s|-]{1}(\S+)",scan0)
+            scan = "%s-%s-%s"%exp.groups()
+            if "/" in scan:
+                nrs = scan.split("-")[-1]
+                scan = '-'.join(scan.split("-")[:-1])+"-"+nrs.split("/")[1] # we take only the last number
+            print("old: %s \t->\t new: %s "%(scan0,scan))
+            tile_dir = IO_paths["tiles"]+"/"+scan+"/"
+            if not os.path.exists(tile_dir):
+                trash_list.append(scan)
+               # print("Path to scan does not exists" , scan)
+                continue
+            if scan in scan_list:
+                continue
+            if label.lower() == "pn0":
+                label_list.append('0')
+            elif label.lower() == "pn1":
+                label_list.append('1')
+            elif label.lower() == "pnx":
+                label_list.append('missing')
+            else:
+                assert(False), "something wrong"+ label
+            scan_list.append(scan)
+        print(f" + total number scans with label and tiles: {len(scan_list)}" )
+        print(f" + positive scans (1): {np.sum(np.asarray(label_list)=='1')}")
+        print(f" + negative scans (0): {np.sum(np.asarray(label_list)=='0')}")
+        print(f" + 'missing' info scans: {np.sum(np.asarray(label_list)=='missing')}")
+        data = {'scan': scan_list, 'label': label_list}
+        df_new = pandas.DataFrame(data)
+        df_new.to_csv(IO_paths["csv_labels"],index=False)
 
-                clean_files, xmin, ymin, width = check_parallel(files,subdir)
-
-                print("number raw tiles:", len(files))
-                print("number clean tiles:", len(clean_files))
-                for i, file in enumerate(clean_files):
-                    xpos, ypos, width, h = map(int, dict(re.findall(r'(\w+)=(\d+)', file)).values())
-                    x_rel = int((xpos-xmin)/width)
-                    y_rel = int((ypos-ymin)/width)
-                    new_file = scan_name +'_'+str(i)+'_'+str(x_rel)+'_'+str(y_rel)+'.png'
-                    new_path = os.path.join(newdir,new_file)
-                    file_path = os.path.join(subdir, file)
-                    copyfile(file_path , new_path)
-
-                dirty_files = list(set(files)-set(clean_files))
-                newdir = os.path.join(IO_paths["tiles_dirty"],scan_name)
-                pathlib.Path(newdir).mkdir(parents=True, exist_ok=True)
-                for i,file in enumerate(dirty_files):
-                    file_path = os.path.join(subdir, file)
-                    new_path = os.path.join(newdir, file)
-                    copyfile(file_path , new_path)
-
-
+        dir_list = [x[0].split("/")[-1] for x in os.walk(IO_paths["tiles"])]
