@@ -9,10 +9,11 @@ from pathlib import Path
 def get_project_root() -> Path:
     return str(Path(__file__).parent.parent)
 
-root_path = get_project_root()
-data_path = root_path + 'CCC/'
-csv_path = root_path + 'CCC-labels.csv'
+root_path ="/work/rwth0777/data/CCC_01/" #get_project_root()
 
+cohort = "mainz" # "aachen"
+data_path = root_path + cohort + '/tiles/'
+csv_path = root_path +cohort+ "/"+ cohort +'_labels.csv'
 
 def sort_into_classes_by_csv(data_path, csv_path):
     for cls in ['pos', 'neg', 'missing']:
@@ -49,7 +50,8 @@ def train_val_split_slides(data_path, classes, split_fraction=0.125, rand_seed=0
             slides_in_cls[cls] = os.listdir(data_path + cls + '/')
             n_slides[cls] = 0
             for slide in slides_in_cls[cls]:
-                n_tiles_in_slide[cls].append(len(os.listdir(data_path + cls + '/' + slide + '/tiles')))
+                #n_tiles_in_slide[cls].append(len(os.listdir(data_path + cls + '/' + slide + '/tiles')))
+                n_tiles_in_slide[cls].append(len(os.listdir(data_path + cls + '/' + slide )))
                 n_slides[cls] += 1
             n_tiles_in_slide[cls] = np.array(n_tiles_in_slide[cls])
             n_tiles_in_class[cls] = np.sum(n_tiles_in_slide[cls])
@@ -152,3 +154,8 @@ def get_layers_list(module):
             layers_list.append(layer)
     return layers_list
     
+if __name__ == '__main__':
+    sort_into_classes_by_csv(data_path, csv_path)
+    print("done sorting")
+    train_val_split_slides(data_path,["0","1"], 0.15)
+    print("done split train val!")

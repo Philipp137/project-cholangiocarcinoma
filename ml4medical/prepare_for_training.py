@@ -19,7 +19,7 @@ import pathlib
 from qupath_utils import create_qupath_project_file, create_qupath_classes_file
 from normalize import normalizeStaining
 from PIL import Image
-from joblib import Parallel, delayed
+#from joblib import Parallel, delayed
 
 
 
@@ -106,6 +106,9 @@ elif cohort == "mainz":
                 "csv_file": '/run/media/pkrah/Elements/mainz/mainz.csv', # this is the raw data csv file
                 "csv_labels": '/run/media/pkrah/Elements/mainz/mainz_labels.csv'} # this is the cleaned csv_file
 
+    IO_paths = {"tiles": '/work/rwth0777/data/CCC_01/mainz/tiles/',
+                "csv_file": '/work/rwth0777/data/CCC_01/mainz/mainz.csv', # this is the raw data csv file
+                "csv_labels": '/work/rwth0777/data/CCC_01/mainz/mainz_labels.csv'} # this is the cleaned csv_file
 if cohort == "aachen":
     for filename in sorted(glob.glob(IO_paths["source"]+'**/*.tif', recursive=True)):
         i = i + 1
