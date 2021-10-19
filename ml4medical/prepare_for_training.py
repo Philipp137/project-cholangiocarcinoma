@@ -187,17 +187,17 @@ elif cohort == "mainz":
             if scan in scan_list:
                 continue
             if label.lower() == "pn0":
-                label_list.append('0')
+                label_list.append('neg')
             elif label.lower() == "pn1":
-                label_list.append('1')
+                label_list.append('pos')
             elif label.lower() == "pnx":
                 label_list.append('missing')
             else:
                 assert(False), "something wrong"+ label
             scan_list.append(scan)
         print(f" + total number scans with label and tiles: {len(scan_list)}" )
-        print(f" + positive scans (1): {np.sum(np.asarray(label_list)=='1')}")
-        print(f" + negative scans (0): {np.sum(np.asarray(label_list)=='0')}")
+        print(f" + positive scans (1): {np.sum(np.asarray(label_list)=='pos')}")
+        print(f" + negative scans (0): {np.sum(np.asarray(label_list)=='neg')}")
         print(f" + 'missing' info scans: {np.sum(np.asarray(label_list)=='missing')}")
         data = {'scan': scan_list, 'label': label_list}
         df_new = pandas.DataFrame(data)
