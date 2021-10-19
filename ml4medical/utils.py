@@ -11,7 +11,8 @@ def get_project_root() -> Path:
 
 root_path ="/work/rwth0777/data/CCC_01/" #get_project_root()
 
-cohort = "mainz" # "aachen"
+cohort = "mainz" 
+#cohort = "aachen"
 data_path = root_path + cohort + '/tiles/'
 csv_path = root_path +cohort+ "/"+ cohort +'_labels.csv'
 
@@ -155,7 +156,7 @@ def get_layers_list(module):
     return layers_list
     
 if __name__ == '__main__':
-    sort_into_classes_by_csv(data_path, csv_path)
-    print("done sorting")
-    train_val_split_slides(data_path,["0","1"], 0.15)
+    #sort_into_classes_by_csv(data_path, csv_path)
+    #print("done sorting")
+    train_val_split_slides(data_path,["neg", "pos"], 0.3, 0)
     print("done split train val!")

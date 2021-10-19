@@ -6,7 +6,7 @@
     "random_seed": 42,
     "augmentations": "heavy",
     "balance": "undersample",
-    "epoches": 200,
+    "epoches": 100,
     "batch_size": 256,
     "subbatch_size": 0,
     "val_batch_size": 256,
@@ -18,12 +18,13 @@
   },
   "model":
   {
-    "net_type": "Timm",
-    "variant": "vit_small_patch16_224",
+    "net_type": "ResNet",
+    "variant": "resnet18",
     "pretrained": true,
     "num_classes": 2,
     "relevance_class": false,
-    "freeze_until": -11,
+    "dropout": 0,
+    "freeze_until": -6,
     "subbatch_mean": "probs",
     "optimizer": {"Adam": {"lr": [1e-6, 2e-6], "weight_decay": 1e-4}}
   },
@@ -36,6 +37,6 @@
   "data_folder":
   {
     "MSIMSS": "CRC_KR_kather_split/",
-    "CCC": "CCC/"
+    "CCC": "CCC_01/mainz/tiles/"
   }
 }

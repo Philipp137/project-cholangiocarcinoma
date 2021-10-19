@@ -73,7 +73,9 @@ if __name__ =="__main__":
     model_conf = config['model']
     classifier_net = getattr(net, model_conf['net_type'])(variant=model_conf['variant'],
                                                           num_classes=model_conf['num_classes'] + model_conf['relevance_class'],
-                                                          pretrained=model_conf['pretrained'])
+                                                          pretrained=model_conf['pretrained'],
+                                                          dropout=model_conf['dropout']
+                                                         )
                    
     if 'freeze_until' in config['model'] and config['model']['freeze_until']:
         classifier_net.freeze_until_nth_layer(config['model']['freeze_until'])

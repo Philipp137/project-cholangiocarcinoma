@@ -35,5 +35,5 @@ export CUDA_DEVICE_ORDER=PCI_BUS_ID
 # ------------------------
 conda activate ml4med_test
 
-#srun python main.py -c config_CCC.json
-srun python show_val_heatmap_CCC.py
+srun python main.py -c config_CCC.json
+#srun python show_val_heatmap_CCC.py
