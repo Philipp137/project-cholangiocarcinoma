@@ -2,7 +2,7 @@ import argparse
 import numpy as np
 from PIL import Image
 
-#from joblib import Parallel, delayed
+from joblib import Parallel, delayed
 import os
 import glob
 
@@ -200,29 +200,34 @@ def normalizeStaining(img, saveFile=None, Io=240, alpha=1, beta=0.15):
 
     return Inorm, H, E
 
-#def check_file(file_path):
-#            img = np.array(Image.open(file_path))
-#            h,w,c = img.shape
-#            if not h ==  w:
-#                print("shapes differ:",file_path)
-#            try:
-#                normalizeStaining(img=img,
-#                          Io=args.Io,
-#                          alpha=args.alpha,
-#                          beta=args.beta)
-#            except:
-#                print("corrupted:", file_path)
+def check_file(file_path, move_dest):
+            import shutil
+            img = np.array(Image.open(file_path))
+            h,w,c = img.shape
+            if not h ==  w:
+                print("shapes differ:",file_path)
+            try:
+                normalizeStaining(img=img,
+                          Io=args.Io,
+                          alpha=args.alpha,
+                          beta=args.beta)
+            except:
+                shutil.move(file_path, move_dest) 
+                print("corrupted:", file_path)
 
 
-#def check_parallel(data_path, n_jobs=24):
-#        files = glob.iglob(data_path+"**/*.png",recursive=True)
-#        res = Parallel(n_jobs=n_jobs)(map(delayed(check_file), files))
+def check_parallel(data_path, destination, n_jobs=24):
+        files = glob.iglob(data_path+"**/*.png",recursive=True)
+        check = lambda file_path: check_file(file_path,destination)
+        res = Parallel(n_jobs=n_jobs)(map(delayed(check), files))
 
 if __name__ == '__main__':
 
     from torchvision import transforms, datasets
     import matplotlib.pyplot as plt
     from torch.utils.data import DataLoader
+    import warnings
+    warnings.filterwarnings("error")
 
     test_transform = False
 
@@ -238,8 +243,9 @@ if __name__ == '__main__':
 
         #img = np.array(Image.open(args.imageFile))
 
-        rootdir = '/work/nb671233/data/CCC_01/CCC/train/'
-        #check_parallel(rootdir,n_jobs=24)
+        rootdir = '/work/nb671233/data/CCC_01/mainz/tiles/'
+        corrupted_files_destination = '/work/nb671233/data/CCC_01/mainz/tiles/warnings/'
+        check_parallel(rootdir,corrupted_files_destination,n_jobs=24)
 
         print("end")
         #for fname in glob.iglob(rootdir+"**/*.png",recursive=True):
