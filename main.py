@@ -11,10 +11,11 @@ from ml4medical.utils import get_project_root
 
 
 if __name__ =="__main__":
-    config_file_name = 'config_MSI1.json'
+    config_file_name = 'config_CCC.json'
     from_shell = True
     args = None
     this_dir = get_project_root()
+    print("Hello this is ml4medical")
     #this_dir = "/home/nb671233/project-cholangiocarcinoma"
     if from_shell:
         parser = argparse.ArgumentParser()

@@ -12,7 +12,7 @@
 #SBATCH --cpus-per-task=12   		
 #SBATCH --mem=0 				## 32 GB for gpus
 #SBATCH --gres=gpu:pascal:2                      ## request 2 gpus per node
-#SBATCH --time=7:00:00
+#SBATCH --time=2:00:00
 
 
 source ~/.zshrc
@@ -24,6 +24,7 @@ export PYTHONFAULTHANDLER=1
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
 #export CUDA_VISIBLE_DEVICES=0,1,2,3
 
+echo "all variables exported"
 # on your cluster you might need these:
 # set the network interface
 # export NCCL_SOCKET_IFNAME=^docker0,lo
@@ -33,6 +34,7 @@ export CUDA_DEVICE_ORDER=PCI_BUS_ID
 #module load cuda/110
 #module load cudnn/8.0.5
 # ------------------------
-conda activate ml4med_test
-
-python main.py -c config_MSI1.json
+conda activate ml4medical
+echo "activation of conda complete running python now"
+srun python main.py -c config_MSI1.json
+echo "done"

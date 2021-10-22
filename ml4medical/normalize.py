@@ -202,6 +202,9 @@ def normalizeStaining(img, saveFile=None, Io=240, alpha=1, beta=0.15):
 
 def check_file(file_path, move_dest):
             import shutil
+            import warnings
+            warnings.filterwarnings("error")
+            np.seterr(all='warn')
             img = np.array(Image.open(file_path))
             h,w,c = img.shape
             if not h ==  w:
@@ -226,8 +229,6 @@ if __name__ == '__main__':
     from torchvision import transforms, datasets
     import matplotlib.pyplot as plt
     from torch.utils.data import DataLoader
-    import warnings
-    warnings.filterwarnings("error")
 
     test_transform = False
 

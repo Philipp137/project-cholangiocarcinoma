@@ -23,7 +23,7 @@ source ~/.zshrc
 #module load cuda/110
 #module load cudnn/8.0.5
 # ------------------------
-conda activate ml4med_test
+conda activate ml4medical
 
-#python ml4medical/normalize.py
-srun python show_val_heatmap_CCC.py
+python ml4medical/normalize.py
+#srun python show_val_heatmap_CCC.py
