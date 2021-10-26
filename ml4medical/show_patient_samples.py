@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 data_folder = '/work/nb671233/data/CCC_01/CCC/'
 #data_folder = 'D:/Arbeit/med_data/CCC/'
-data_cohorts = ['mainz']
+data_cohorts = ['mainz', 'aachen']
 
 tv = 'train'
 
@@ -25,11 +25,17 @@ def make_datasets(root_folder = '/work/nb671233/data/CCC_01/CCC/', cohorts=['aac
     }
 
 
-def show_samples(ds, cohorts, all_transforms = False, default_transforms=True, n_slides=3, n_samples=25):
+def show_samples(ds, cohorts, cls=None, all_transforms = False, default_transforms=True, n_slides=3, n_samples=25):
     all_cohort_samples = []
     for cohort in cohorts:
         val_dataset = ds[cohort]
-        slides = np.random.choice(list(val_dataset.parent_slide.keys()), n_slides)
+        if cls is None:
+            slides = np.random.choice(list(val_dataset.parent_slide.keys()), n_slides)
+            cls = [val_dataset.parent_slide_class[np.argmax(slide == np.array(val_dataset.parent_slide_name))] for slide in slides]
+        else:
+            cls = val_dataset.class_to_idx[cls] if isinstance(cls, str) else cls
+            slides = np.random.choice(list(val_dataset.parent_slide_per_class[cls].keys()), n_slides)
+            cls = [cls] * n_slides
         val_dataset.apply_transforms = all_transforms
         val_dataset.apply_default_transforms = default_transforms
         sample_idxs = [np.random.choice(list(val_dataset.parent_slide[slide]), n_samples) for slide in slides]
@@ -39,7 +45,7 @@ def show_samples(ds, cohorts, all_transforms = False, default_transforms=True, n
         val_dataset.apply_transforms = True
         val_dataset.apply_default_transforms = False
         slide_grids = [make_grid(slide_samples, int(np.ceil(np.sqrt(n_samples)))) for slide_samples in samples]
-
+        
         all_cohort_samples.append(make_grid(torch.stack(slide_grids), n_slides))
 
     all_samples = make_grid(torch.stack(all_cohort_samples), 1)
@@ -47,4 +53,7 @@ def show_samples(ds, cohorts, all_transforms = False, default_transforms=True, n
     plt.imshow(all_samples.permute([1, 2, 0]))
 
 datasets = make_datasets(data_folder, data_cohorts, tv)
-show_samples(datasets, ['mainz', 'mainz', 'mainz'])
+show_samples(datasets, ['mainz', 'mainz', 'mainz'], 0)
+show_samples(datasets, ['mainz', 'mainz', 'mainz'], 1)
+show_samples(datasets, ['aachen', 'aachen', 'aachen'], 0)
+show_samples(datasets, ['aachen', 'aachen', 'aachen'], 1)
