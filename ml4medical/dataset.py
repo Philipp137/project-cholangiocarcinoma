@@ -19,7 +19,8 @@ def parent_slide_name_MSIMSS(tile_path):
 
 
 def parent_slide_name_CCC(tile_path):
-    return os.path.split(Path(tile_path).resolve().parents[1])[-1]
+    slide_name = os.path.split(Path(tile_path).resolve().parents[0])[-1]
+    return slide_name if slide_name != 'tiles' else os.path.split(Path(tile_path).resolve().parents[1])[-1]
 
 
 def tile_position_CCC(tile_path):
