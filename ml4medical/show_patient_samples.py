@@ -4,11 +4,11 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-def make_datasets(root_folder = '/work/nb671233/data/CCC_01/CCC/', cohorts=['aachen', 'mainz'], train_val='val'):
+def make_datasets(root_folder = '/work/nb671233/data/CCC_01/', cohorts=['aachen', 'mainz'], train_val='val'):
     
     return {
         cohort: TileImageDataset(
-            root_folder=root_folder + cohort,
+            root_folder=root_folder + cohort + '/tiles/',
             mode=train_val,
             data_variant='CCC',
             normalize=True,
