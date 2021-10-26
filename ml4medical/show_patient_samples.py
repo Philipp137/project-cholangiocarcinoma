@@ -4,13 +4,6 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 
-data_folder = '/work/nb671233/data/CCC_01/CCC/'
-#data_folder = 'D:/Arbeit/med_data/CCC/'
-data_cohorts = ['mainz', 'aachen']
-
-tv = 'train'
-
-
 def make_datasets(root_folder = '/work/nb671233/data/CCC_01/CCC/', cohorts=['aachen', 'mainz'], train_val='val'):
     
     return {
@@ -51,9 +44,18 @@ def show_samples(ds, cohorts, cls=None, all_transforms = False, default_transfor
     all_samples = make_grid(torch.stack(all_cohort_samples), 1)
     plt.figure()
     plt.imshow(all_samples.permute([1, 2, 0]))
+    
+    
+if __name__ == '__main__':
+    data_folder = '/work/nb671233/data/CCC_01/CCC/'
+    # data_folder = 'D:/Arbeit/med_data/CCC/'
+    data_cohorts = ['mainz', 'aachen']
+    
+    tv = 'train'
 
-datasets = make_datasets(data_folder, data_cohorts, tv)
-show_samples(datasets, ['mainz', 'mainz', 'mainz'], 0)
-show_samples(datasets, ['mainz', 'mainz', 'mainz'], 1)
-show_samples(datasets, ['aachen', 'aachen', 'aachen'], 0)
-show_samples(datasets, ['aachen', 'aachen', 'aachen'], 1)
+    datasets = make_datasets(data_folder, data_cohorts, tv)
+    show_samples(datasets, ['mainz', 'mainz', 'mainz'], 0)
+    show_samples(datasets, ['mainz', 'mainz', 'mainz'], 1)
+    show_samples(datasets, ['aachen', 'aachen', 'aachen'], 0)
+    show_samples(datasets, ['aachen', 'aachen', 'aachen'], 1)
+
