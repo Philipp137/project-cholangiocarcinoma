@@ -69,14 +69,16 @@ def show_transforms(data_module, samples_per_class, samples_per_row, variant='CC
     train_c0_samples = make_grid(ds[train_class_0_idxs][0].clone(), samples_per_row)
     train_c1_samples = make_grid(ds[train_class_1_idxs][0].clone(), samples_per_row)
     ds.apply_transforms = False
+    ds.apply_default_transforms = True
     train_c0_samples_orig = ds[train_class_0_idxs][0]
     train_c1_samples_orig = ds[train_class_1_idxs][0]
-    if variant == 'CCC':
-        train_c0_samples_orig = transforms.Resize(256)(train_c0_samples_orig)
-        train_c1_samples_orig = transforms.Resize(256)(train_c1_samples_orig)
+    # if variant == 'CCC':
+    #     train_c0_samples_orig = ds.default_transforms(train_c0_samples_orig)
+    #     train_c1_samples_orig = ds.default_transforms(train_c1_samples_orig)
     train_c0_samples_orig = make_grid(train_c0_samples_orig, samples_per_row)
     train_c1_samples_orig = make_grid(train_c1_samples_orig, samples_per_row)
     ds.apply_transforms = True
+    ds.apply_default_transforms = True
     
     all_samples = make_grid(torch.stack([train_c0_samples, train_c1_samples, train_c0_samples_orig, train_c1_samples_orig]), 2)
     plt.figure()
